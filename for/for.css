@@ -270,7 +270,7 @@ main { position: relative; z-index: 0; }
 
 /* ---------- 3. A day with Apex ---------- */
 .stat {
-  padding: 0 var(--gutter) clamp(96px, 12vw, 160px);
+  padding: clamp(96px, 12vw, 160px) var(--gutter);
   text-align: center;
 }
 .stat strong { display: block; font-weight: 800; font-size: clamp(64px, 9vw, 140px); line-height: 0.9; letter-spacing: -0.05em; }
@@ -572,9 +572,60 @@ main { position: relative; z-index: 0; }
   .rows.inbox > .row { grid-template-columns: minmax(0, 1fr) auto; }
   .rows.inbox .from { grid-column: 1 / -1; margin-bottom: -8px; }
   .panels { grid-template-columns: 1fr; }
-  .board { grid-auto-columns: minmax(120px, 1fr); }
-  .doc, .skin-gdoc .page { padding: 20px; }
-  .toast { left: 12px; right: 12px; bottom: 12px; font-size: 12.5px; }
+  .doc, .skin-gdoc .page { padding: 16px 18px; }
+  .toast { left: 10px; right: 10px; bottom: 10px; padding: 9px 12px; font-size: 12px; }
+
+  /* Phones: every tool gets a compact version of itself, so nothing is cut off. */
+  .scene .main { padding: 12px; }
+  .scene-head { margin-bottom: 8px; }
+  .scene-head b { font-size: 15px; }
+  .scene-head span { font-size: 11px; }
+  .chip { padding: 2px 6px; font-size: 10px; }
+
+  .board { grid-auto-columns: minmax(0, 1fr); gap: 5px; }
+  .col { padding: 5px; gap: 5px; border-radius: 8px; }
+  .col > small { font-size: 10px; padding: 1px 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card { padding: 6px 7px; font-size: 11px; border-radius: 6px; }
+  .card .muted { font-size: 10px; }
+  .skin-linear .card .muted { font-size: 11px; }
+  .meter small { font-size: 10.5px; }
+
+  .cal { grid-template-columns: 24px repeat(5, minmax(0, 1fr)); }
+  .cal .d { padding: 0 3px 6px; font-size: 9px; }
+  .cal .d em { font-size: 16px; }
+  .cal .t span { right: 4px; font-size: 9px; }
+  .ev { left: 2px; right: 2px; padding: 3px 4px; font-size: 9.5px; border-radius: 4px; }
+  .skin-gcal .scene-head b::before { display: none; }
+
+  .row { gap: 6px; padding: 8px 4px; font-size: 11.5px; }
+  .row.head { font-size: 10px; }
+  .row .tags { gap: 4px; }
+  .rows.lines > .row.total { font-size: 14px; }
+  .skin-sheets .rows > .row > * { padding: 6px 5px; min-height: 30px; }
+  .skin-crm .rows { margin: 10px 8px; }
+  .skin-crm .scene-head { padding: 10px 12px; }
+  .skin-books .scene-head span { padding: 5px 9px; font-size: 10.5px; }
+  .skin-books .doc { padding: 14px; }
+
+  .doc h4, .skin-gdoc .page h4 { font-size: 17px; }
+  .doc h5 { margin-top: 12px; font-size: 12.5px; }
+  .doc li, .panel ul { font-size: 12.5px; }
+  .skin-gdoc .menu-bar { gap: 10px; font-size: 11.5px; padding-bottom: 8px; }
+  .panels { gap: 8px; margin-top: 10px; }
+  .panel { padding: 10px 12px; }
+
+  .skin-slack .thread { gap: 12px; padding: 12px; }
+  .skin-slack .scene-head { padding: 10px 12px; }
+  .skin-slack .composer { margin: 0 12px 12px; padding: 10px 12px; font-size: 13px; }
+  .msg { grid-template-columns: 30px minmax(0, 1fr); gap: 8px; }
+  .av { width: 30px; height: 30px; font-size: 11px; }
+  .who { font-size: 13.5px; }
+  .msg p { font-size: 13.5px; }
+  .receipt { font-size: 11px; }
+
+  .recap strong { font-size: 44px; }
+  .recap ul { margin-top: 16px; padding: 0 12px; }
+  .recap li { padding: 8px 10px; font-size: 12.5px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

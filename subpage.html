@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;800&display=swap" rel="stylesheet">
   <!-- Shares the top bar, menu, buttons, hero and window styles with the audience pages. -->
-  <link href="for/for.css?v=20260928b" rel="stylesheet">
+  <link href="for/for.css?v=20260929a" rel="stylesheet">
   <style>
     section.block { padding: clamp(96px, 12vw, 160px) var(--gutter); text-align: center; }
     section.block > h2 { max-width: 20ch; margin: 0 auto; }
@@ -156,6 +156,8 @@
     @media (max-width: 560px) {
       .camps, .trust { grid-template-columns: 1fr; }
       .chat { padding: 18px 16px 8px; min-height: 0; }
+      .chat .used { flex-wrap: wrap; row-gap: 2px; font-size: 12px; }
+      .chat .done li { font-size: 12.5px; }
       .claude .win-bar .url { display: none; }
     }
   </style>
@@ -276,7 +278,7 @@
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/lenis@1.3.26/dist/lenis.min.js"></script>
-  <script src="for/for.js?v=20260928b"></script>
+  <script src="for/for.js?v=20260929a"></script>
   <script>
     // The demos play once they're on screen and reset when they leave, so they replay on the way back.
     // Each element marked data-t appears that many ms in; numbers marked data-count count up.

@@ -164,6 +164,19 @@
       right: clamp(20px, 6vw, 96px);
     }
 
+    /* Phones: the copy sits at the top on black; the photo fills the lower part and fades up into it. */
+    @media (max-width: 640px) {
+      .hero { background: #000; }
+      .hero img { position: absolute; left: 0; bottom: 0; height: 70%; object-position: 72% 50%; }
+      .hero::after {
+        background: linear-gradient(to bottom,
+          #000 0%, #000 30%, rgba(0, 0, 0, 0.6) 38%, rgba(0, 0, 0, 0) 52%,
+          rgba(0, 0, 0, 0) 86%, var(--ink) 100%);
+      }
+      .hero-copy { top: clamp(96px, 14vh, 130px); bottom: auto; }
+    }
+
+
     h1 {
       font-weight: 800;
       font-size: clamp(44px, 7vw, 116px);
@@ -426,6 +439,8 @@
     .play [data-t].in { opacity: 1; transform: none; }
     @media (max-width: 560px) {
       .chat { padding: 18px 16px 8px; min-height: 0; }
+      .chat .used { flex-wrap: wrap; row-gap: 2px; font-size: 12px; }
+      .chat .done li { font-size: 12.5px; }
       .claude .url { display: none; }
     }
 
@@ -720,26 +735,69 @@
     .scale .marks span:nth-child(2) { left: 50%; transform: translateX(-50%); }
     .scale .marks span:nth-child(3) { right: 0; }
 
+    /* Progress dots: phones only (see below). */
+    .here .steps { display: none; }
+
+    /* Phones: the map sheet becomes a stacked card. A location strip on top, the map in the
+       middle, and the step's info as a strip along the bottom. Nothing floats over the map. */
     @media (max-width: 760px) {
-      .sheet { inset: 20px 16px; }
-      .legend { display: none; }
-      .window { --gap: 18px; }
-      .panel { left: var(--gap); width: auto; }
-      .card { padding: 20px 22px 22px; }
-      .card .icon { width: 48px; height: 48px; }
-      .card .icon svg { width: 22px; height: 22px; }
-      .card p { margin-top: 12px; }
+      .sheet { inset: clamp(64px, 9vh, 80px) 12px 16px; }
+      .window { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
+      #topo { position: relative; grid-row: 2; inset: auto; }
+      .legend, .compass { display: none; }
+
+      .here {
+        position: static;
+        grid-row: 1;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+        padding: 12px 14px;
+        border: 0;
+        border-bottom: 2px solid var(--paper);
+        outline: 0;
+      }
+      .here .dot { width: 12px; height: 12px; box-shadow: 0 0 0 3px var(--ink), 0 0 0 5px var(--paper); flex: none; }
+      .here b { font-size: 15px; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .here .steps { display: flex; gap: 5px; flex: none; }
+      .here .steps i { width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid var(--paper); transition: background-color 0.3s ease; }
+      .here .steps i.on { background: var(--paper); }
+
+      .panel {
+        position: static;
+        grid-row: 3;
+        width: auto;
+        border: 0;
+        border-top: 2px solid var(--paper);
+        outline: 0;
+      }
+      .card { padding: 16px 16px 18px; }
+      .card-head { gap: 14px; }
+      .card .icon { width: 44px; height: 44px; border-width: 2.5px; }
+      .card .icon svg { width: 20px; height: 20px; }
+      .card .icon img { width: 26px; }
+      .card h3 { font-size: 22px; }
+      .card p { margin-top: 10px; font-size: 15px; }
       .card ul { display: none; }
-      .here { min-width: 0; padding: 9px 14px 10px 12px; }
-      .here b { font-size: 15px; }
-      .compass { display: none; }
     }
 
+    /* Phones: a roomier web with smaller nodes, and compact task pills that wrap instead of stretching. */
     @media (max-width: 640px) {
-      .avatar { width: 52px; height: 52px; font-size: 15px; border-width: 2.5px; }
-      .chip { font-size: 13px; padding: 6px 12px 6px 6px; }
-      .chip i {
-      position: relative; width: 24px; height: 24px; font-size: 9.5px; }
+      .avatar { width: 44px; height: 44px; font-size: 13px; border-width: 2.5px; }
+      .badge { min-width: 22px; height: 22px; top: -7px; right: -9px; font-size: 11px; line-height: 17px; border-width: 2px; }
+      .waiting .you { width: 84px; font-size: 20px; border-width: 3px; }
+      .load .you.apex { width: 92px; }
+      .load .you.me { width: 80px; font-size: 18px; }
+      .chip {
+        max-width: 168px;
+        padding: 6px 11px 6px 6px;
+        font-size: 12px;
+        line-height: 1.25;
+        white-space: normal;
+        border-width: 2px;
+      }
+      .chip i { position: relative; width: 22px; height: 22px; border-width: 1.5px; }
     }
 
 
@@ -765,7 +823,7 @@
     <img src="img/hero-climber.jpg" alt="A climber carrying skis up a steep snow slope above a range of peaks and clouds.">
     <div class="hero-copy">
       <h1>You don’t have to do it all alone.</h1>
-      <a class="cta" href="subpage.html">Find out how we can help</a>
+      <a class="cta" href="subpage.html">Find out how Apex can help</a>
     </div>
   </section>
 
@@ -855,6 +913,7 @@
       <div class="here" aria-live="polite">
         <span class="dot"></span>
         <b id="hereName">Trailhead</b>
+        <span class="steps" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span>
       </div>
 
       <div class="legend" id="legend">
@@ -1028,7 +1087,7 @@
         w = stage.clientWidth;
         var h = stage.clientHeight;
         cx = w / 2; cy = h * 0.46;
-        var rx = Math.min(w * 0.4, 360), ry = h * 0.4;
+        var rx = Math.min(w * (w < 640 ? 0.4 : 0.4), 360), ry = h * (w < 640 ? 0.36 : 0.4);
         people.forEach(function (p, k) {
           var a = -Math.PI / 2 + (k < 3 ? k : k + 1) * (Math.PI / 3);
           p.x = cx + Math.cos(a) * rx; p.y = cy + Math.sin(a) * ry;
@@ -1052,7 +1111,7 @@
         if (needsYou) needEl.textContent = ++need; else doneEl.textContent = ++done;
       }
 
-      function fly(text, x0, y0, x1, y1, dur, cb) {
+      function fly(text, x0, y0, x1, y1, dur, cb, short) {
         var chip = document.createElement("div");
         chip.className = "chip";
         chip.innerHTML = '<i><span class="face">' + FACE + "</span></i><span>" + text + "</span>";
@@ -1060,38 +1119,47 @@
         var half = chip.offsetWidth / 2 + 8;
         var cl = function (x) { return Math.min(w - half, Math.max(half, x)); };
         var at = function (k, sc) { return "translate(" + cl(x0 + (x1 - x0) * k) + "px," + (y0 + (y1 - y0) * k) + "px) translate(-50%,-50%) scale(" + sc + ")"; };
-        var anim = chip.animate([
+        // On phones the pill fades out before it reaches the next node, so it never covers it.
+        var frames = short ? [
+          { transform: at(0, 0.9), opacity: 0 },
+          { transform: at(0.06, 1), opacity: 1, offset: 0.12 },
+          { transform: at(0.45, 1), opacity: 1, offset: 0.78 },
+          { transform: at(0.58, 0.9), opacity: 0 }
+        ] : [
           { transform: at(0, 0.9), opacity: 0 },
           { transform: at(0.08, 1), opacity: 1, offset: 0.1 },
           { transform: at(0.82, 1), opacity: 1, offset: 0.86 },
           { transform: at(1, 0.5), opacity: 0 }
-        ], { duration: dur, easing: "linear", fill: "forwards" });
+        ];
+        var anim = chip.animate(frames, { duration: dur, easing: "linear", fill: "forwards" });
         anim.onfinish = function () { chip.remove(); cb(); };
         return anim;
       }
 
+      // On phones each question plays out fully (to Apex, then on to you if needed) before the next one leaves.
+      var phone = matchMedia("(max-width: 640px)").matches, running = false, inFlight = false;
+      function next() { inFlight = false; if (phone && running) timer = setTimeout(send, 700); }
       function send(ahead) {
         var p = people[[0, 3, 1, 4, 2][turn++ % people.length]];
         var item = p.asks[p.n++ % p.asks.length];
+        inFlight = true;
         var sx = p.x + (cx - p.x) * 0.22, sy = p.y + (cy - p.y) * 0.22;
-        var anim = fly(item[0], sx, sy, cx, cy, 3000, function () {
-          if (item[1]) log(item[1], false);
-          else fly(item[0], cx, cy, meX, meY, 1800, function () { log(item[0], true); });
-        });
+        var anim = fly(item[0], sx, sy, cx, cy, phone ? 2600 : 3000, function () {
+          if (item[1]) { log(item[1], false); next(); }
+          else fly(item[0], cx, cy, meX, meY, 1800, function () { log(item[0], true); next(); });
+        }, phone);
         if (ahead) anim.currentTime = ahead;
       }
 
       var started = false;
       function start() {
-        if (timer) return;
-        if (!started) {
-          started = true;
-          send(2000);
-          send(700);
-        }
+        if (running) return;
+        running = true;
+        if (phone) { if (!inFlight) send(started ? 0 : 700); started = true; return; }
+        if (!started) { started = true; send(2000); send(700); }
         timer = setInterval(send, 1700);
       }
-      function stop() { clearInterval(timer); timer = null; }
+      function stop() { running = false; clearInterval(timer); clearTimeout(timer); timer = null; }
 
       layout();
       addEventListener("resize", layout);
@@ -1256,7 +1324,7 @@
       var STOP_NAMES = ["Trailhead", "Camp 01 · Connect", "Camp 02 · Remember", "Camp 03 · Ask", "Camp 04 · Act", "The summit of freedom"];
       function at(n, zoom) {
         var p = STOP_PTS[n];
-        return mobile ? { x: p[0], y: p[1], w: zoom * 0.62, fx: 0.5, fy: 0.26 } : { x: p[0], y: p[1], w: zoom, fx: 0.28, fy: 0.34 };
+        return mobile ? { x: p[0], y: p[1], w: zoom * 0.8, fx: 0.5, fy: 0.5 } : { x: p[0], y: p[1], w: zoom, fx: 0.28, fy: 0.34 };
       }
       function keys() {
         var o = overview(), K = [];
@@ -1277,6 +1345,7 @@
         return K;
       }
       var hereName = document.getElementById("hereName"), hereNow = "";
+      var stepDots = Array.prototype.slice.call(document.querySelectorAll(".here .steps i"));
       var K = [];
 
       function ease(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
@@ -1314,12 +1383,14 @@
         // Current location: the last stop reached, switching as we arrive at the next.
         var name = STOP_NAMES[t > 0.85 ? B.here : A.here];
         if (name !== hereNow) { hereNow = name; hereName.textContent = name; }
+        var at = t > 0.85 ? B.here : A.here;
+        stepDots.forEach(function (d, i) { d.classList.toggle("on", i <= at); });
       }
 
       function resize() {
-        var box = svg.parentNode.getBoundingClientRect();
+        var box = svg.getBoundingClientRect();
         W = box.width; H = box.height;
-        mobile = W < 760;
+        mobile = matchMedia("(max-width: 760px)").matches;
         K = keys();
         render();
       }
@@ -1412,7 +1483,7 @@
         w = stage.clientWidth;
         var h = stage.clientHeight;
         cx = w / 2; cy = h * 0.46;
-        var rx = Math.min(w * (w < 640 ? 0.36 : 0.4), 480), ry = h * 0.38;
+        var rx = Math.min(w * (w < 640 ? 0.4 : 0.4), 480), ry = h * (w < 640 ? 0.42 : 0.38);
         people.forEach(function (p, k) {
           var a = -Math.PI / 2 + (k / people.length) * Math.PI * 2;
           p.x = cx + Math.cos(a) * rx;
@@ -1450,12 +1521,20 @@
         var sx = clampX(p.x + (cx - p.x) * 0.22), sy = p.y + (cy - p.y) * 0.22;
         var at = function (x, y, sc) { return "translate(" + x + "px," + y + "px) translate(-50%,-50%) scale(" + sc + ")"; };
         var pt = function (k, sc) { return at(clampX(lerp(sx, cx, k)), lerp(sy, cy, k), sc); };
-        var anim = chip.animate([
+        // On phones the pill fades out before it reaches you, so it never covers "You".
+        var phone = matchMedia("(max-width: 640px)").matches;
+        var frames = phone ? [
+          { transform: pt(0, 0.9), opacity: 0 },
+          { transform: pt(0.06, 1), opacity: 1, offset: 0.12 },
+          { transform: pt(0.45, 1), opacity: 1, offset: 0.78 },
+          { transform: pt(0.58, 0.9), opacity: 0 }
+        ] : [
           { transform: pt(0, 0.9), opacity: 0 },
           { transform: pt(0.08, 1), opacity: 1, offset: 0.1 },
           { transform: pt(0.82, 1), opacity: 1, offset: 0.86 },
           { transform: pt(1, 0.5), opacity: 0 }
-        ], { duration: 3200, easing: "linear", fill: "forwards" });
+        ];
+        var anim = chip.animate(frames, { duration: 3200, easing: "linear", fill: "forwards" });
         if (ahead) anim.currentTime = ahead;
         anim.onfinish = function () { chip.remove(); arrive(p); };
       }
@@ -1463,12 +1542,13 @@
       function start() {
         if (timer) return;
         if (!started) {
-          // First run: already mid-flow, with two pills partway down their lines.
+          // First run: already mid-flow, with pills partway down their lines (just one on phones).
           started = true;
-          send(2200);
+          if (!matchMedia("(max-width: 640px)").matches) send(2200);
           send(900);
         }
-        timer = setInterval(send, 1600);
+        // Phones get one pill at a time, so they never overlap.
+        timer = setInterval(send, matchMedia("(max-width: 640px)").matches ? 3400 : 1600);
       }
       function stop() { clearInterval(timer); timer = null; }
 
