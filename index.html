@@ -147,14 +147,6 @@
       display: block;
       filter: grayscale(1);
     }
-    /* A soft shade over the upper sky keeps the logo and headline readable. */
-    .hero::after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(to bottom, rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0.4) 25%, rgba(0, 0, 0, 0.15) 50%, rgba(0, 0, 0, 0) 70%);
-    }
-
     /* The copy sits in the dark sky, clear of the climber on the right. */
     .hero-copy {
       position: absolute;
@@ -164,16 +156,10 @@
       right: clamp(20px, 6vw, 96px);
     }
 
-    /* Phones: the copy sits at the top on black; the photo fills the lower part and fades up into it. */
+    /* Phones: the photo fills the screen, climber in frame; the copy sits in the dark sky above him. */
     @media (max-width: 640px) {
-      .hero { background: #000; }
-      .hero img { position: absolute; left: 0; bottom: 0; height: 70%; object-position: 72% 50%; }
-      .hero::after {
-        background: linear-gradient(to bottom,
-          #000 0%, #000 30%, rgba(0, 0, 0, 0.6) 38%, rgba(0, 0, 0, 0) 52%,
-          rgba(0, 0, 0, 0) 86%, var(--ink) 100%);
-      }
-      .hero-copy { top: clamp(96px, 14vh, 130px); bottom: auto; }
+      .hero img { object-position: 72% 50%; }
+      .hero-copy { top: clamp(112px, 16vh, 146px); }
     }
 
 
