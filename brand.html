@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Apex Brand</title>
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="img/logo/app-icon.png" type="image/png">
+  <link rel="icon" href="img/logo/favicon.svg" type="image/svg+xml">
+  <link href="https://cdn.jsdelivr.net/npm/lenis@1.3.26/dist/lenis.css" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink: #1C3A28;
+      --paper: #ECECE4;
+      --soft: rgba(236, 236, 228, 0.7);
+      --pad: clamp(20px, 6vw, 96px);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--ink);
+      color: var(--paper);
+      font-family: "Inter Tight", system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      font-size: clamp(17px, 1.3vw, 20px);
+      line-height: 1.5;
+    }
+    img { display: block; max-width: 100%; }
+
+    /* Top bar: hides on the way down, returns with a soft black fade on the way up. */
+    .site-head {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+      padding: clamp(20px, 3vw, 36px) var(--pad) 16px;
+      transition: opacity 0.4s ease, transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+    .site-head::before {
+      content: ""; position: absolute; inset: 0 0 -60px 0; z-index: -1; pointer-events: none;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.7), rgba(0,0,0,0.45) 40%, rgba(0,0,0,0.18) 70%, rgba(0,0,0,0));
+      opacity: 0; transition: opacity 0.4s ease;
+    }
+    .site-head.solid::before { opacity: 1; }
+    .site-head.away { opacity: 0; transform: translateY(-14px); pointer-events: none; }
+    .site-head img { height: clamp(24px, 2.2vw, 30px); width: auto; }
+
+    section { position: relative; padding: clamp(110px, 14vw, 200px) var(--pad); }
+    h1, h2 { font-weight: 800; letter-spacing: -0.035em; line-height: 0.98; }
+    h2 { font-size: clamp(40px, 6vw, 96px); max-width: 14ch; }
+    .sub { font-size: clamp(19px, 1.7vw, 25px); color: var(--soft); max-width: 30ch; margin-top: clamp(20px, 2.4vw, 32px); line-height: 1.4; }
+    .center { text-align: center; }
+    .center h2, .center .sub { margin-left: auto; margin-right: auto; }
+
+    /* Gentle rise into view, once. */
+    .rise { opacity: 0; transform: translateY(24px); transition: opacity 0.9s ease, transform 1.1s cubic-bezier(0.2, 0.8, 0.2, 1); }
+    .rise.in { opacity: 1; transform: none; }
+
+    /* Full-bleed photo sections */
+    .shot { min-height: 100vh; min-height: 100svh; overflow: hidden; background: #000; display: flex; align-items: flex-start; }
+    .shot > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: grayscale(1); }
+    .shot::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(0,0,0,0.72), rgba(0,0,0,0.25) 40%, rgba(0,0,0,0) 60%, rgba(0,0,0,0.35)); }
+    .shot > div { position: relative; z-index: 1; }
+    .shot.bottom { align-items: flex-end; }
+    .shot.bottom::after { background: linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0) 40%, rgba(0,0,0,0.75)); }
+    .cover h1 { font-size: clamp(50px, 8.4vw, 136px); max-width: 10ch; padding-top: clamp(40px, 8vh, 110px); }
+
+    /* The climb: three photos, three words */
+    .climb { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: clamp(56px, 7vw, 96px); }
+    .climb figure { position: relative; aspect-ratio: 3 / 4; border-radius: 22px; overflow: hidden; background: #000; }
+    .climb img { width: 100%; height: 100%; object-fit: cover; filter: grayscale(1); }
+    .climb figure::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(0,0,0,0) 45%, rgba(0,0,0,0.8)); }
+    .climb .forest::before { content: ""; position: absolute; inset: 0; background: rgba(28, 58, 40, 0.6); z-index: 1; }
+    .climb figcaption { position: absolute; left: 24px; right: 24px; bottom: 22px; z-index: 2; }
+    .climb b { display: block; font-size: clamp(28px, 2.6vw, 40px); font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+    .climb span { display: block; color: var(--soft); margin-top: 8px; }
+
+    /* Two audiences */
+    .who { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(40px, 6vw, 96px); margin-top: clamp(56px, 7vw, 96px); }
+    .who b { display: block; font-size: clamp(64px, 8vw, 128px); font-weight: 800; letter-spacing: -0.05em; line-height: 0.9; }
+    .who p { font-size: clamp(19px, 1.7vw, 25px); color: var(--soft); margin-top: 16px; max-width: 22ch; line-height: 1.35; }
+    .who p strong { color: var(--paper); font-weight: 800; }
+
+    /* The mark */
+    .mark { background: var(--paper); color: var(--ink); }
+    .mark .sub { color: rgba(28, 58, 40, 0.72); }
+    .mark .icon { width: clamp(180px, 24vw, 340px); margin: 0 auto clamp(56px, 6vw, 80px); }
+
+    /* Logos */
+    .logos { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; margin-top: clamp(56px, 7vw, 96px); }
+    .tile { border-radius: 22px; min-height: clamp(220px, 22vw, 320px); display: grid; place-items: center; padding: clamp(28px, 4vw, 56px); position: relative; overflow: hidden; }
+    .tile img { max-height: clamp(70px, 9vw, 150px); width: auto; max-width: 100%; position: relative; }
+    .tile.photo > img:first-child { position: absolute; inset: 0; width: 100%; height: 100%; max-height: none; object-fit: cover; filter: grayscale(1) brightness(0.6); }
+    .t-black { background: #000; }
+    .t-paper { background: var(--paper); }
+    .t-deep { background: #142c1e; }
+    .w6 { grid-column: span 6; } .w3 { grid-column: span 3; } .w2 { grid-column: span 2; } .w4 { grid-column: span 4; }
+
+    /* Colour */
+    .swatches { display: grid; grid-template-columns: 3fr 2fr 1fr; gap: 14px; margin-top: clamp(56px, 7vw, 96px); }
+    .sw { border-radius: 22px; min-height: clamp(300px, 30vw, 440px); padding: clamp(24px, 2.8vw, 36px); display: flex; flex-direction: column; justify-content: space-between; }
+    .sw b { font-size: clamp(26px, 2.4vw, 38px); font-weight: 800; letter-spacing: -0.03em; line-height: 1.05; }
+    .sw span { font-size: 15px; opacity: 0.75; }
+    .sw.green { background: #142c1e; }
+    .sw.paper { background: var(--paper); color: var(--ink); }
+    .sw.black { background: #000; }
+
+    /* Photography */
+    .gallery { display: grid; grid-template-columns: 7fr 5fr; gap: 14px; margin-top: clamp(56px, 7vw, 96px); }
+    .gallery img { width: 100%; height: 100%; object-fit: cover; filter: grayscale(1); border-radius: 22px; aspect-ratio: 16 / 10; }
+    .gallery img:nth-child(2), .gallery img:nth-child(3) { aspect-ratio: auto; }
+
+    /* Close */
+    .close { text-align: center; align-items: center; justify-content: center; }
+    .close::after { background: linear-gradient(to bottom, var(--ink), rgba(0,0,0,0.5) 30%, rgba(0,0,0,0.6) 70%, #000); }
+    .close .stack { width: clamp(150px, 16vw, 220px); margin: 0 auto 44px; }
+    .close h2 { margin: 0 auto; }
+
+    footer { background: #000; padding: 28px var(--pad); font-size: 13px; color: var(--soft); }
+
+    @media (max-width: 900px) {
+      .climb { grid-template-columns: 1fr; }
+      .climb figure { aspect-ratio: 4 / 3; }
+      .who { grid-template-columns: 1fr; }
+      .swatches { grid-template-columns: 1fr 1fr; }
+      .sw.green { grid-column: span 2; }
+      .gallery { grid-template-columns: 1fr; }
+      .gallery img, .gallery img:nth-child(2), .gallery img:nth-child(3) { aspect-ratio: 4 / 3; }
+      .w3, .w4 { grid-column: span 6; } .w2 { grid-column: span 3; }
+    }
+    @media (max-width: 640px) {
+      .swatches { grid-template-columns: 1fr; }
+      .sw.green { grid-column: auto; }
+      .sw { min-height: 200px; }
+      .w2 { grid-column: span 6; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .rise { opacity: 1; transform: none; transition: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="site-head">
+    <a href="#top" aria-label="Back to top"><img src="img/logo/lockup.png" alt="Apex"></a>
+  </header>
+
+  <section class="shot cover" id="top">
+    <img src="img/summit.jpg" alt="A lone hiker on a snowy summit">
+    <div><h1>From the forest to the summit.</h1></div>
+  </section>
+
+  <section>
+    <h2 class="rise">The customer is the hero. Apex is the guide.</h2>
+    <p class="sub rise">We lead owners out of the forest of doing it all, up to freedom and peace of mind.</p>
+    <div class="climb">
+      <figure class="rise"><div class="forest"></div><img src="img/ridges.jpg" alt=""><figcaption><b>The forest</b><span>Where they are.</span></figcaption></figure>
+      <figure class="rise"><img src="img/hero.jpg" alt=""><figcaption><b>The trail</b><span>Where we guide.</span></figcaption></figure>
+      <figure class="rise"><img src="img/hero-climber.jpg" alt=""><figcaption><b>The summit</b><span>Who they become.</span></figcaption></figure>
+    </div>
+  </section>
+
+  <section style="padding-top: 0;">
+    <h2 class="rise">They built something real, and got trapped inside it.</h2>
+    <div class="who">
+      <div class="rise"><b>82%</b><p>of <strong>business owners</strong> lose sleep over work.</p></div>
+      <div class="rise"><b>52%</b><p>of <strong>creators</strong> have burned out.</p></div>
+    </div>
+  </section>
+
+  <section class="shot bottom">
+    <img src="img/hero.jpg" alt="">
+    <div>
+      <h2 class="rise">Freedom is a climb.</h2>
+      <p class="sub rise" style="color: var(--paper);">That’s why the whole brand lives in the mountains.</p>
+    </div>
+  </section>
+
+  <section class="mark center">
+    <img class="icon rise" src="img/brand/icon-green.png" alt="The Apex icon">
+    <h2 class="rise">A hiker, a flag, the top.</h2>
+    <p class="sub rise">The mountain is conquered. Freedom is claimed. The guide isn’t in the picture.</p>
+  </section>
+
+  <section>
+    <h2 class="rise">The logo.</h2>
+    <div class="logos">
+      <div class="tile t-deep w6 rise"><img src="img/logo/lockup.png" alt="Apex lockup"></div>
+      <div class="tile t-paper w3 rise"><img src="img/brand/stack-green.png" alt="Apex stacked, green"></div>
+      <div class="tile t-black w3 rise"><img src="img/logo/stack.png" alt="Apex stacked, beige"></div>
+      <div class="tile t-deep w2 rise"><img src="img/logo/icon.png" alt="Apex icon"></div>
+      <div class="tile t-black w2 rise"><img src="img/logo/app-icon.png" alt="Apex app icon"></div>
+      <div class="tile t-paper w2 rise"><img src="img/brand/icon-green.png" alt="Apex icon, green"></div>
+      <div class="tile photo w4 rise"><img src="img/ridges.jpg" alt=""><img src="img/logo/lockup-host.png" alt="Apex.host lockup"></div>
+      <div class="tile t-paper w2 rise"><img src="img/brand/wordmark-host-green.png" alt="Apex.host wordmark"></div>
+    </div>
+  </section>
+
+  <section style="padding-top: 0;">
+    <h2 class="rise">Green. Calm, stable, trusted.</h2>
+    <div class="swatches">
+      <div class="sw green rise"><b>Forest</b><span>#1C3A28</span></div>
+      <div class="sw paper rise"><b>Paper</b><span>#ECECE4</span></div>
+      <div class="sw black rise"><b>Black</b><span>#000000</span></div>
+    </div>
+  </section>
+
+  <section style="padding-top: 0;">
+    <h2 class="rise">Black and white. Contrast and character.</h2>
+    <div class="gallery">
+      <img class="rise" src="img/ridges.jpg" alt="Mountain ridges">
+      <img class="rise" src="img/hero.jpg" alt="A rope team on a ridge">
+      <img class="rise" src="img/hero-climber.jpg" alt="A climber on a snow slope">
+      <img class="rise" src="img/summit.jpg" alt="A hiker on a summit">
+    </div>
+  </section>
+
+  <section class="center" style="padding-top: 0;">
+    <h2 class="rise">Calm. Direct. A little rugged.</h2>
+    <p class="sub rise">Talk like a guide who’s done this climb before.</p>
+  </section>
+
+  <section class="shot close">
+    <img src="img/summit.jpg" alt="">
+    <div class="rise">
+      <img class="stack" src="img/logo/stack.png" alt="Apex">
+      <h2>Every summit has a guide.</h2>
+    </div>
+  </section>
+
+  <footer>© 2026 Apex.host</footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/lenis@1.3.26/dist/lenis.min.js"></script>
+  <script>
+    (function () {
+      var reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (!reduce && window.Lenis) window.lenis = new Lenis({ autoRaf: true, lerp: 0.075, wheelMultiplier: 0.9, anchors: true });
+
+      var io = new IntersectionObserver(function (es) {
+        es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } });
+      }, { threshold: 0.12, rootMargin: "0px 0px -6% 0px" });
+      document.querySelectorAll(".rise").forEach(function (el) { io.observe(el); });
+
+      var head = document.querySelector(".site-head"), lastY = scrollY, tick = false;
+      addEventListener("scroll", function () {
+        if (tick) return;
+        tick = true;
+        requestAnimationFrame(function () {
+          tick = false;
+          var y = scrollY;
+          if (y < 80) head.classList.remove("away", "solid");
+          else if (y > lastY + 4) head.classList.add("away");
+          else if (y < lastY - 4) { head.classList.remove("away"); head.classList.add("solid"); }
+          lastY = y;
+        });
+      }, { passive: true });
+    })();
+  </script>
+</body>
+</html>
