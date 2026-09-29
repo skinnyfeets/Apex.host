@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>How Apex works</title>
+  <meta name="description" content="Connect your tools. Apex remembers, works with the AI you already use, and takes action for you.">
+  <link rel="icon" href="img/logo/app-icon.png" type="image/png">
+  <link rel="icon" href="img/logo/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="img/logo/app-icon.png">
+  <link href="https://cdn.jsdelivr.net/npm/lenis@1.3.26/dist/lenis.css" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;800&display=swap" rel="stylesheet">
+  <!-- Shares the top bar, menu, buttons, hero and window styles with the audience pages. -->
+  <link href="for/for.css?v=20260928b" rel="stylesheet">
+  <style>
+    section.block { padding: clamp(96px, 12vw, 160px) var(--gutter); text-align: center; }
+    section.block > h2 { max-width: 20ch; margin: 0 auto; }
+    .lead { max-width: 40ch; margin: 18px auto 0; font-size: clamp(18px, 1.5vw, 22px); line-height: 1.45; }
+
+    /* ---------- The four camps ---------- */
+    .camps {
+      list-style: none;
+      max-width: 1180px;
+      margin: clamp(48px, 6vw, 80px) auto 0;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: clamp(24px, 3vw, 48px);
+    }
+    .camps .ring {
+      width: 76px; height: 76px;
+      margin: 0 auto 20px;
+      border-radius: 50%;
+      border: 3px solid var(--paper);
+      display: grid;
+      place-items: center;
+    }
+    .camps svg { width: 32px; height: 32px; fill: none; stroke: var(--paper); stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; }
+    .camps small { display: block; font-weight: 500; font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.7; }
+    .camps b { display: block; margin-top: 6px; font-weight: 800; font-size: clamp(20px, 1.8vw, 26px); letter-spacing: -0.02em; }
+    .camps p { max-width: 24ch; margin: 8px auto 0; font-size: 16px; line-height: 1.4; }
+
+    /* ---------- Demos: they play once they're on screen, and replay when you come back ---------- */
+    .play [data-t] { opacity: 0; transform: translateY(8px); transition: opacity 0.6s ease, transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1); }
+    .play [data-t].in { opacity: 1; transform: none; }
+
+    /* Demo 1: tools connect and feed one memory. This is Apex's own screen, so it's in brand colours. */
+    .connect {
+      max-width: 1040px;
+      margin: clamp(48px, 6vw, 72px) auto 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 150px minmax(0, 1fr);
+      gap: clamp(20px, 3vw, 40px);
+      align-items: center;
+      text-align: left;
+    }
+    .tools-list { list-style: none; display: grid; gap: 10px; }
+    .tools-list li {
+      display: grid;
+      grid-template-columns: 34px 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding: 10px 14px;
+      border: 2px solid rgba(236, 236, 228, 0.3);
+      border-radius: 12px;
+      transition: border-color 0.5s ease;
+    }
+    .tools-list li.in { border-color: var(--paper); }
+    .tools-list .logo-sq { width: 34px; height: 34px; border-radius: 8px; display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 14px; }
+    .tools-list b { font-weight: 800; font-size: 16px; }
+    .tools-list .st { font-weight: 500; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.55; transition: opacity 0.4s ease; }
+    .tools-list li.in .st { opacity: 1; }
+    .tools-list .st::before { content: "Waiting"; }
+    .tools-list li.in .st::before { content: "✓ Connected"; }
+    /* The .play rule would hide these rows until connected; keep them visible, just dimmed. */
+    .play .tools-list li[data-t] { opacity: 0.55; transform: none; }
+    .play .tools-list li[data-t].in { opacity: 1; }
+
+    .core { display: grid; place-items: center; gap: 14px; }
+    .core .node {
+      width: 128px; height: 128px;
+      border-radius: 50%;
+      border: 3px solid var(--paper);
+      display: grid;
+      place-items: center;
+      box-shadow: 0 0 0 10px var(--ink), 0 0 0 12px rgba(236, 236, 228, 0.3);
+    }
+    .core .node img { width: 62%; height: auto; }
+    .core .flow { width: 100%; height: 3px; background: linear-gradient(90deg, rgba(236, 236, 228, 0.1), var(--paper)); border-radius: 3px; }
+
+    .memory {
+      border: 2px solid var(--paper);
+      outline: 1px solid var(--paper);
+      outline-offset: 5px;
+      padding: 22px 24px;
+    }
+    .memory small { display: block; font-weight: 500; font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.75; margin-bottom: 14px; }
+    .memory dl { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 20px; }
+    .memory dd { font-weight: 800; font-size: clamp(30px, 3vw, 44px); line-height: 1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+    .memory dt { margin-top: 4px; font-size: 14px; }
+
+    /* Demo 2: a Claude chat with Apex plugged in, looking like Claude. */
+    .claude {
+      max-width: 820px;
+      margin: clamp(48px, 6vw, 72px) auto 0;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #faf9f5;
+      color: #1f1e1d;
+      text-align: left;
+      box-shadow: 0 40px 90px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(0, 0, 0, 0.2);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    .claude .win-bar .url { max-width: 360px; }
+    .claude-top { display: flex; justify-content: space-between; align-items: center; padding: 14px 22px; border-bottom: 1px solid #ebe9e1; font-size: 14px; }
+    .claude-top b { font-family: Georgia, "Times New Roman", serif; font-weight: 500; font-size: 17px; }
+    .claude-top .conn { display: inline-flex; align-items: center; gap: 7px; padding: 4px 10px; border: 1px solid #dedcd3; border-radius: 999px; font-size: 12.5px; color: #5a5850; }
+    .claude-top .conn img { width: 13px; height: auto; filter: brightness(0.3); }
+    .chat { display: grid; gap: 16px; padding: 24px 28px 8px; min-height: 470px; align-content: start; }
+    .chat .me { justify-self: end; max-width: 78%; padding: 11px 16px; border-radius: 14px; background: #f0eee6; font-size: 15px; line-height: 1.45; }
+    .chat .used {
+      justify-self: start;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 12px;
+      border: 1px solid #dedcd3;
+      border-radius: 10px;
+      background: #fff;
+      font-size: 13px;
+      color: #5a5850;
+    }
+    .chat .used::before { content: ""; width: 14px; height: 15px; background: url("img/logo/icon.png") center / contain no-repeat; filter: brightness(0.3); }
+    .chat .used em { font-style: normal; color: #8a877c; }
+    .chat .says { font-family: Georgia, "Times New Roman", serif; font-size: 16.5px; line-height: 1.55; }
+    .chat .says ul { margin: 6px 0 0 20px; display: grid; gap: 4px; }
+    .chat .says b { font-weight: 700; }
+    .chat .done { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 14px; }
+    .chat .done li { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; background: #e6f4ea; color: #137333; }
+    .chat .done li span { margin-left: auto; font-size: 12px; color: #5f6368; }
+    .claude-input { margin: 8px 22px 22px; padding: 14px 16px; border: 1px solid #dedcd3; border-radius: 14px; background: #fff; font-size: 14.5px; color: #8a877c; }
+
+    /* ---------- Trust, in three lines ---------- */
+    .trust { list-style: none; max-width: 1000px; margin: clamp(40px, 5vw, 64px) auto 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(20px, 3vw, 40px); }
+    .trust li { font-weight: 800; font-size: clamp(20px, 1.8vw, 26px); letter-spacing: -0.02em; line-height: 1.2; }
+    .trust li::before { content: ""; display: block; width: 44px; height: 3px; margin: 0 auto 16px; background: var(--paper); }
+
+    .closing .note { margin-top: 20px; font-size: 15px; }
+
+    @media (max-width: 900px) {
+      .camps, .trust { grid-template-columns: 1fr 1fr; }
+      .connect { grid-template-columns: 1fr; }
+      .core .flow { width: 3px; height: 40px; background: linear-gradient(180deg, rgba(236, 236, 228, 0.1), var(--paper)); }
+    }
+    @media (max-width: 560px) {
+      .camps, .trust { grid-template-columns: 1fr; }
+      .chat { padding: 18px 16px 8px; min-height: 0; }
+      .claude .win-bar .url { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="site-head">
+    <a href="index.html"><img class="logo" src="img/logo/lockup.png" alt="Apex"></a>
+    <a class="seen" href="https://www.danmartell.com" target="_blank" rel="noopener">As seen from <b>Dan Martell</b></a>
+    <button class="burger" id="burger" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="menu"><span></span><span></span><span></span></button>
+  </header>
+
+  <nav class="menu" id="menu" aria-label="Site">
+    <ul>
+      <li><a href="index.html" style="--i: 0">Home</a></li>
+      <li><a href="subpage.html" style="--i: 1">How it works</a></li>
+      <li><a href="index.html#for" style="--i: 2">Who it’s for</a></li>
+      <li><a href="index.html#join" style="--i: 3">Join the waitlist</a></li>
+    </ul>
+  </nav>
+
+  <main>
+    <section class="hero">
+      <img class="hero-img" src="img/ridges.jpg" alt="" style="object-position: 50% 60%">
+      <h1>How Apex works.</h1>
+      <div><a class="cta" href="index.html#join">Join the waitlist</a></div>
+    </section>
+
+    <!-- The four camps, at a glance -->
+    <section class="block">
+      <h2>Four camps to the summit.</h2>
+      <ol class="camps">
+        <li><div class="ring"><svg viewBox="0 0 24 24"><path d="M12 4 3 20h18zM9.5 20 12 14l2.5 6M12 4l-1.6-2M12 4l1.6-2"/></svg></div><small>Camp 01</small><b>Connect your tools</b><p>Sign in once. Gmail, Slack, HubSpot and 1,379 more.</p></li>
+        <li><div class="ring"><svg viewBox="0 0 24 24"><path d="M3 6.5 9 4l6 2.5L21 4v13.5L15 20l-6-2.5L3 20zM9 4v13.5M15 6.5V20"/></svg></div><small>Camp 02</small><b>It remembers</b><p>Every update builds one memory of your business.</p></li>
+        <li><div class="ring"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0zM14.8 9.2l-1.9 4.5-4.6 1.9 1.9-4.5z"/></svg></div><small>Camp 03</small><b>Ask your LLM</b><p>Claude, ChatGPT or Grok. Same brain, any model.</p></li>
+        <li><div class="ring"><svg viewBox="0 0 24 24"><path d="M4 21l16-4M4 17l16 4M12 15c-2.8 0-4.5-1.9-4.5-4.3 0-2.9 2.6-3.8 2.6-7.2 2 1.2 6.4 3.6 6.4 7.4 0 2.3-1.7 4.1-4.5 4.1z"/></svg></div><small>Camp 04</small><b>It takes action</b><p>It does the work in your tools, and shows its receipts.</p></li>
+      </ol>
+    </section>
+
+    <!-- Demo 1: connect once, it remembers everything -->
+    <section class="block">
+      <h2>Connect once. It remembers everything.</h2>
+      <p class="lead">No setup, no filing, no tagging. Apex reads the tools you already use.</p>
+      <div class="connect play">
+        <ul class="tools-list">
+          <li data-t="300"><span class="logo-sq" style="background:#ea4335">M</span><b>Gmail</b><span class="st"></span></li>
+          <li data-t="900"><span class="logo-sq" style="background:#4a154b">S</span><b>Slack</b><span class="st"></span></li>
+          <li data-t="1500"><span class="logo-sq" style="background:#1a73e8">31</span><b>Google Calendar</b><span class="st"></span></li>
+          <li data-t="2100"><span class="logo-sq" style="background:#ff7a59">H</span><b>HubSpot</b><span class="st"></span></li>
+          <li data-t="2700"><span class="logo-sq" style="background:#635bff">S</span><b>Stripe</b><span class="st"></span></li>
+        </ul>
+        <div class="core">
+          <div class="flow" aria-hidden="true"></div>
+          <div class="node"><img src="img/logo/stack.png" alt="Apex"></div>
+          <div class="flow" aria-hidden="true"></div>
+        </div>
+        <div class="memory">
+          <small>Your business memory</small>
+          <dl>
+            <div><dd data-count="2489" data-t="600">0</dd><dt>people</dt></div>
+            <div><dd data-count="534" data-t="1200">0</dd><dt>companies</dt></div>
+            <div><dd data-count="214" data-t="1800">0</dd><dt>deals</dt></div>
+            <div><dd data-count="87" data-t="2400">0</dd><dt>promises made</dt></div>
+          </dl>
+        </div>
+      </div>
+    </section>
+
+    <!-- Demo 2: ask the AI you already use; Apex answers from memory, then acts -->
+    <section class="block">
+      <h2>Ask the AI you already use.</h2>
+      <p class="lead">Apex brings the memory. Then it does the work.</p>
+      <div class="claude play">
+        <div class="win-bar"><span class="dots"><i></i><i></i><i></i></span><span class="url">claude.ai/new</span></div>
+        <div class="claude-top"><b>Claude</b><span class="conn"><img src="img/logo/icon.png" alt="">Apex connected</span></div>
+        <div class="chat">
+          <div class="me" data-t="300">Who’s waiting on me this week?</div>
+          <div class="used" data-t="1300">Used Apex <em>· searched Gmail, Slack, HubSpot</em></div>
+          <div class="says" data-t="2300">Three people, and one is overdue:
+            <ul>
+              <li><b>Dana at Northwind</b>: the security review you promised 11 days ago</li>
+              <li><b>Marcus</b>: pricing for the 500-seat tier</li>
+              <li><b>Priya</b>: an intro to the Harbour team</li>
+            </ul>
+          </div>
+          <div class="me" data-t="4200">Send Dana the review and move the deal.</div>
+          <div class="used" data-t="5200">Used Apex <em>· took 3 actions</em></div>
+          <div class="says" data-t="6100">Done.
+            <ul class="done">
+              <li>✓ Review sent to Dana<span>Gmail</span></li>
+              <li>✓ Northwind moved to Proposal sent<span>HubSpot</span></li>
+              <li>✓ Follow-up set for Friday<span>Calendar</span></li>
+            </ul>
+          </div>
+        </div>
+        <div class="claude-input">Reply to Claude…</div>
+      </div>
+    </section>
+
+    <!-- Trust -->
+    <section class="block">
+      <h2>It works for you. Never around you.</h2>
+      <ul class="trust">
+        <li>You choose what it can see.</li>
+        <li>Every action is logged.</li>
+        <li>Big calls still come to you.</li>
+      </ul>
+    </section>
+
+    <section class="closing">
+      <h2>Peace of mind is waiting.</h2>
+      <a class="cta" href="index.html#join">Join the waitlist</a>
+    </section>
+  </main>
+
+  <footer class="site-foot">
+    <a href="index.html"><img src="img/logo/lockup-host.png" alt="Apex.host, home"></a>
+    <nav><a href="index.html">Home</a><span>© 2026 Apex.host</span></nav>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/lenis@1.3.26/dist/lenis.min.js"></script>
+  <script src="for/for.js?v=20260928b"></script>
+  <script>
+    // The demos play once they're on screen and reset when they leave, so they replay on the way back.
+    // Each element marked data-t appears that many ms in; numbers marked data-count count up.
+    (function () {
+      var reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+      function count(el) {
+        var to = +el.dataset.count, t0 = performance.now();
+        if (reduce) { el.textContent = to.toLocaleString("en-US"); return; }
+        (function tick(now) {
+          var k = Math.min(1, (now - t0) / 1400);
+          el.textContent = Math.round(to * (1 - Math.pow(1 - k, 3))).toLocaleString("en-US");
+          if (k < 1) requestAnimationFrame(tick);
+        })(t0);
+      }
+      document.querySelectorAll(".play").forEach(function (demo) {
+        var timers = [];
+        var items = demo.querySelectorAll("[data-t]");
+        new IntersectionObserver(function (es) {
+          es.forEach(function (e) {
+            timers.forEach(clearTimeout);
+            timers = [];
+            if (e.isIntersecting) {
+              items.forEach(function (el) {
+                timers.push(setTimeout(function () {
+                  el.classList.add("in");
+                  if (el.dataset.count) count(el);
+                }, reduce ? 0 : +el.dataset.t));
+              });
+            } else {
+              items.forEach(function (el) {
+                el.classList.remove("in");
+                if (el.dataset.count) el.textContent = "0";
+              });
+            }
+          });
+        }, { threshold: 0.4 }).observe(demo);
+      });
+    })();
+  </script>
+</body>
+</html>

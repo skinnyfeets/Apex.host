@@ -1,0 +1,13 @@
+# macOS
+.DS_Store
+
+# Local tooling and backups
+.claude/
+
+# Source files that aren't part of the site (kept out so they're never published by accident)
+Apex Target Audience Research.pdf
+Apex/
+/09f57dcd713af1ca79d85d757246227f.jpg
+/60d2aa3ec63a047f4720abd34b07cbc2.jpg
+/7332dacb45ec8404b77ec59883afc56c.jpg
+/912ba1ed58b4c10319e628c76912f455.jpg

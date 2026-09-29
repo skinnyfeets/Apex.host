@@ -1,0 +1,1513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Apex</title>
+  <link rel="icon" href="img/logo/app-icon.png" type="image/png">
+  <link rel="icon" href="img/logo/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="img/logo/app-icon.png">
+  <link href="https://cdn.jsdelivr.net/npm/lenis@1.3.26/dist/lenis.css" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      /* The two brand colours: green is the surface, beige is the type. */
+      --ink: #1C3A28;
+      --paper: #ECECE4;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      min-height: 100svh;
+      background: var(--ink);
+      color: var(--paper);
+      font-family: "Inter Tight", system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ---------- Top bar: logo, badge, menu button ---------- */
+    /* The bar stays pinned: it fades away while you scroll down and fades back in when you scroll up,
+       on a green backing so it reads over anything behind it. At the very top it sits clear. */
+    .site-head {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 60;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      padding: clamp(20px, 3vw, 36px) clamp(20px, 6vw, 96px) clamp(14px, 1.6vw, 20px);
+      transition: opacity 0.4s ease, transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), background-color 0.4s ease;
+    }
+    .site-head.away { opacity: 0; transform: translateY(-14px); pointer-events: none; }
+    /* Scrolling back up: a soft black fade behind the bar instead of a solid colour. */
+    .site-head::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 -70px 0;
+      z-index: -1;
+      pointer-events: none;
+      /* Many stops so the fade eases out evenly, with no visible edge. */
+      background: linear-gradient(to bottom,
+        rgba(0, 0, 0, 0.72) 0%,
+        rgba(0, 0, 0, 0.62) 18%,
+        rgba(0, 0, 0, 0.48) 36%,
+        rgba(0, 0, 0, 0.33) 52%,
+        rgba(0, 0, 0, 0.19) 68%,
+        rgba(0, 0, 0, 0.08) 84%,
+        rgba(0, 0, 0, 0) 100%);
+      opacity: 0;
+      transition: opacity 0.5s ease;
+    }
+    .site-head.solid::before { opacity: 1; }
+    .menu-open .site-head { opacity: 1; transform: none; pointer-events: auto; }
+    .menu-open .site-head::before { opacity: 0; }
+
+    .seen { font-weight: 500; font-size: 15px; white-space: nowrap; color: var(--paper); text-decoration: none; transition: opacity 0.25s ease; }
+    .seen:hover { opacity: 0.6; }
+    .seen b { font-weight: 800; }
+
+    .burger {
+      justify-self: end;
+      width: 48px; height: 48px;
+      display: grid;
+      place-items: center;
+      background: none;
+      border: 0;
+      cursor: pointer;
+      color: var(--paper);
+    }
+    .burger span {
+      grid-area: 1 / 1;
+      width: 30px;
+      height: 3px;
+      border-radius: 3px;
+      background: currentColor;
+      transition: transform 0.45s cubic-bezier(0.7, 0, 0.2, 1), opacity 0.25s ease;
+    }
+    .burger span:first-child { transform: translateY(-9px); }
+    .burger span:last-child { transform: translateY(9px); }
+    /* Open: the outer lines cross into an X and the middle one disappears. */
+    .menu-open .burger span:first-child { transform: rotate(45deg); }
+    .menu-open .burger span:nth-child(2) { opacity: 0; transform: scaleX(0.2); }
+    .menu-open .burger span:last-child { transform: rotate(-45deg); }
+    .burger:focus-visible { outline: 2px solid var(--paper); outline-offset: 2px; border-radius: 8px; }
+
+    /* ---------- Full-screen menu ---------- */
+    .menu {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      background: var(--ink);
+      display: flex;
+      align-items: center;
+      padding: 120px clamp(20px, 6vw, 96px) 60px;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.45s ease, visibility 0s linear 0.45s;
+    }
+    .menu-open .menu { opacity: 1; visibility: visible; transition: opacity 0.45s ease; }
+    .menu ul { list-style: none; }
+    .menu a {
+      display: inline-block;
+      color: var(--paper);
+      text-decoration: none;
+      font-weight: 800;
+      font-size: clamp(44px, 7.5vw, 120px);
+      line-height: 1.02;
+      letter-spacing: -0.04em;
+      opacity: 0;
+      transform: translateY(28px);
+      transition: opacity 0.3s ease, transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+    .menu-open .menu a { opacity: 1; transform: none; transition-delay: calc(0.08s + var(--i) * 0.07s); }
+    .menu-open .menu a:hover { opacity: 0.55; transition: opacity 0.25s ease; }
+
+    @media (max-width: 640px) {
+      .seen { font-size: 12px; }
+      .site-head .logo { height: 24px; }
+      .burger span { width: 26px; }
+    }
+
+    /* Full-screen black and white photo; the climber sits on the right third. */
+    .hero {
+      position: relative;
+      height: 100vh;
+      height: 100svh;
+      overflow: hidden;
+    }
+    .hero img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: 70% 50%;
+      display: block;
+      filter: grayscale(1);
+    }
+    /* A soft shade over the upper sky keeps the logo and headline readable. */
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to bottom, rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0.4) 25%, rgba(0, 0, 0, 0.15) 50%, rgba(0, 0, 0, 0) 70%);
+    }
+
+    /* The copy sits in the dark sky, clear of the climber on the right. */
+    .hero-copy {
+      position: absolute;
+      z-index: 1;
+      top: clamp(120px, 20vh, 220px);
+      left: clamp(20px, 6vw, 96px);
+      right: clamp(20px, 6vw, 96px);
+    }
+
+    h1 {
+      font-weight: 800;
+      font-size: clamp(44px, 7vw, 116px);
+      line-height: 0.98;
+      letter-spacing: -0.035em;
+      max-width: 11ch;
+    }
+
+    .cta {
+      display: inline-block;
+      margin-top: clamp(28px, 3.5vw, 44px);
+      padding: 18px 32px;
+      border: 2px solid var(--paper);
+      border-radius: 999px;
+      color: var(--paper);
+      font-weight: 800;
+      font-size: clamp(16px, 1.4vw, 19px);
+      letter-spacing: -0.01em;
+      text-decoration: none;
+      transition: transform 0.25s ease, background-color 0.25s ease, border-color 0.25s ease;
+    }
+    .cta:hover { transform: translateY(-2px); background: var(--ink); border-color: var(--ink); }
+    .cta:focus-visible { outline: 2px solid var(--paper); outline-offset: 4px; }
+
+    .logo { display: block; height: clamp(30px, 3vw, 42px); width: auto; }
+
+    /* ---------- Everyone waits on you ---------- */
+    .waiting {
+      padding: clamp(96px, 12vw, 160px) clamp(20px, 6vw, 96px) clamp(72px, 9vw, 128px);
+    }
+
+    h2 {
+      font-weight: 800;
+      font-size: clamp(32px, 4.4vw, 68px);
+      line-height: 1.02;
+      letter-spacing: -0.03em;
+      max-width: 21ch;
+    }
+
+    .waiting h2 { margin: 0 auto; text-align: center; }
+
+    .stage {
+      position: relative;
+      height: clamp(520px, 68vh, 680px);
+      margin-top: clamp(96px, 11vw, 176px);
+    }
+    .stage svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+    .stage line {
+      stroke: var(--paper);
+      stroke-width: 3;
+      stroke-linecap: round;
+    }
+
+    .person {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+    .avatar {
+      position: relative;
+      width: 64px; height: 64px;
+      border-radius: 50%;
+      border: 3px solid var(--paper);
+      background: var(--ink);
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      font-size: 18px;
+    }
+    /* Head-and-shoulders icon, cropped by the circle like a portrait. */
+    .face {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      overflow: hidden;
+    }
+    .face svg { display: block; width: 100%; height: 100%; fill: var(--paper); }
+
+    .badge {
+      position: absolute;
+      top: -8px; right: -10px;
+      min-width: 28px; height: 28px;
+      padding: 0 7px;
+      border-radius: 999px;
+      background: var(--ink);
+      border: 2.5px solid var(--paper);
+      font-weight: 800;
+      font-size: 13px;
+      line-height: 23px;
+      text-align: center;
+      opacity: 0;
+      transform: scale(0.5);
+      transition: opacity 0.3s ease, transform 0.4s cubic-bezier(0.3, 1.5, 0.5, 1);
+    }
+    .badge.on { opacity: 1; transform: none; }
+
+    .you {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      width: clamp(116px, 10vw, 140px);
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background: var(--ink);
+      border: 4px solid var(--paper);
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      font-size: clamp(24px, 2vw, 30px);
+      letter-spacing: -0.02em;
+      z-index: 4;
+    }
+
+    /* The request travelling down the line: who is asking, and what for. */
+    .chip {
+      position: absolute;
+      left: 0; top: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 16px 8px 8px;
+      border-radius: 999px;
+      border: 2.5px solid var(--paper);
+      background: var(--ink);
+      font-weight: 500;
+      font-size: 15px;
+      white-space: nowrap;
+      z-index: 3;
+      pointer-events: none;
+      opacity: 0;
+    }
+    .chip i {
+      position: relative;
+      font-style: normal;
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      border: 2px solid var(--paper);
+      display: grid;
+      place-items: center;
+      font-size: 10.5px;
+      font-weight: 800;
+      flex: none;
+    }
+    .chip b { font-weight: 800; }
+
+    /* ---------- Mountain band ---------- */
+    .band {
+      position: relative;
+      height: clamp(420px, 80vh, 820px);
+      overflow: hidden;
+    }
+    .band img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: 50% 55%;
+      display: block;
+      filter: grayscale(1);
+    }
+    /* A gentle darkening from the top, which also keeps the beige line readable. */
+    .band::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to bottom, rgba(0, 0, 0, 0.38), rgba(0, 0, 0, 0.2) 30%, rgba(0, 0, 0, 0.06) 55%, rgba(0, 0, 0, 0) 70%);
+    }
+    .band h2 {
+      position: absolute;
+      z-index: 1;
+      top: clamp(48px, 8vw, 112px);
+      left: clamp(20px, 6vw, 96px);
+      right: clamp(20px, 6vw, 96px);
+      max-width: 21ch;
+      margin: 0 auto;
+      text-align: center;
+    }
+
+    /* A band variant with the line low on the photo, over the dark ground, shaded from the bottom. */
+    .band.low img { object-position: 50% 55%; }
+    .band.low::after {
+      background: linear-gradient(to top, rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0.3) 38%, rgba(0, 0, 0, 0) 65%);
+    }
+    .band.low h2 { top: auto; bottom: clamp(48px, 8vw, 112px); max-width: none; }
+
+    /* ---------- See how Apex works for: ---------- */
+    .for { padding: 0 clamp(20px, 6vw, 96px) clamp(120px, 14vw, 200px); }
+    .for h2 { max-width: 1000px; margin: 0 auto; }
+    .who { list-style: none; max-width: 1000px; margin: clamp(32px, 4vw, 56px) auto 0; }
+    .who a {
+      display: flex;
+      align-items: center;
+      gap: clamp(18px, 2vw, 28px);
+      padding: clamp(10px, 1.2vw, 16px) 0;
+      color: var(--paper);
+      text-decoration: none;
+      font-weight: 800;
+      font-size: clamp(28px, 4vw, 60px);
+      line-height: 1.05;
+      letter-spacing: -0.03em;
+      transition: opacity 0.25s ease;
+    }
+    .who .ico {
+      flex: none;
+      width: clamp(52px, 5vw, 72px);
+      height: clamp(52px, 5vw, 72px);
+      border-radius: 50%;
+      border: 3px solid var(--paper);
+      display: grid;
+      place-items: center;
+    }
+    .who svg { width: 44%; height: 44%; fill: none; stroke: var(--paper); stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; }
+    .who .go { margin-left: auto; font-weight: 500; opacity: 0; transform: translateX(-12px); transition: opacity 0.25s ease, transform 0.35s ease; }
+    .who a:hover { opacity: 0.6; }
+    .who a:hover .go { opacity: 1; transform: none; }
+    .who a:focus-visible { outline: 2px solid var(--paper); outline-offset: 6px; }
+
+    /* ---------- Ask the AI you already use: a Claude chat with Apex plugged in ---------- */
+    .ask { padding: clamp(96px, 12vw, 160px) clamp(20px, 6vw, 96px); text-align: center; }
+    .ask h2 { margin: 0 auto; max-width: 20ch; }
+    .ask .lead { max-width: 40ch; margin: 18px auto 0; font-size: clamp(18px, 1.5vw, 22px); line-height: 1.45; }
+    .ask .more { display: inline-block; margin-top: clamp(36px, 4vw, 52px); color: var(--paper); font-weight: 800; font-size: 17px; text-decoration: none; border-bottom: 2px solid var(--paper); padding-bottom: 2px; transition: opacity 0.25s ease; }
+    .ask .more:hover { opacity: 0.6; }
+
+    .claude {
+      max-width: 820px;
+      margin: clamp(48px, 6vw, 72px) auto 0;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #faf9f5;
+      color: #1f1e1d;
+      text-align: left;
+      box-shadow: 0 40px 90px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(0, 0, 0, 0.2);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    .claude .win-bar { display: flex; align-items: center; gap: 14px; padding: 10px 14px; background: #e8eaed; border-bottom: 1px solid #d5d7da; }
+    .claude .dots { display: flex; gap: 7px; }
+    .claude .dots i { width: 12px; height: 12px; border-radius: 50%; background: #ff5f57; }
+    .claude .dots i:nth-child(2) { background: #febc2e; }
+    .claude .dots i:nth-child(3) { background: #28c840; }
+    .claude .url { flex: 1; max-width: 360px; margin: 0 auto; padding: 6px 14px; border-radius: 999px; background: #fff; color: #5f6368; font-size: 12.5px; }
+    .claude-top { display: flex; justify-content: space-between; align-items: center; padding: 14px 22px; border-bottom: 1px solid #ebe9e1; font-size: 14px; }
+    .claude-top b { font-family: Georgia, "Times New Roman", serif; font-weight: 500; font-size: 17px; }
+    .claude-top .conn { display: inline-flex; align-items: center; gap: 7px; padding: 4px 10px; border: 1px solid #dedcd3; border-radius: 999px; font-size: 12.5px; color: #5a5850; }
+    .claude-top .conn img { width: 13px; height: auto; filter: brightness(0.3); }
+    .chat { display: grid; gap: 16px; padding: 24px 28px 8px; min-height: 470px; align-content: start; }
+    .chat .me { justify-self: end; max-width: 78%; padding: 11px 16px; border-radius: 14px; background: #f0eee6; font-size: 15px; line-height: 1.45; }
+    .chat .used { justify-self: start; display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; border: 1px solid #dedcd3; border-radius: 10px; background: #fff; font-size: 13px; color: #5a5850; }
+    .chat .used::before { content: ""; width: 14px; height: 15px; background: url("img/logo/icon.png") center / contain no-repeat; filter: brightness(0.3); }
+    .chat .used em { font-style: normal; color: #8a877c; }
+    .chat .says { font-family: Georgia, "Times New Roman", serif; font-size: 16.5px; line-height: 1.55; }
+    .chat .says ul { margin: 6px 0 0 20px; display: grid; gap: 4px; }
+    .chat .says b { font-weight: 700; }
+    .chat .done { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 14px; }
+    .chat .done li { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; background: #e6f4ea; color: #137333; }
+    .chat .done li span { margin-left: auto; font-size: 12px; color: #5f6368; }
+    .claude-input { margin: 8px 22px 22px; padding: 14px 16px; border: 1px solid #dedcd3; border-radius: 14px; background: #fff; font-size: 14.5px; color: #8a877c; }
+    .play [data-t] { opacity: 0; transform: translateY(8px); transition: opacity 0.6s ease, transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1); }
+    .play [data-t].in { opacity: 1; transform: none; }
+    @media (max-width: 560px) {
+      .chat { padding: 18px 16px 8px; min-height: 0; }
+      .claude .url { display: none; }
+    }
+
+    /* Small footer: the logo, linking home, and a home link. */
+    .site-foot {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 28px clamp(20px, 6vw, 96px);
+      font-size: 14px;
+    }
+    .site-foot img { display: block; height: 26px; width: auto; }
+    .site-foot nav { display: flex; align-items: center; gap: 24px; }
+    .site-foot a { color: var(--paper); text-decoration: none; transition: opacity 0.25s ease; }
+    .site-foot a:hover { opacity: 0.6; }
+    .site-foot span { opacity: 0.7; }
+
+    /* ---------- Join the waitlist ---------- */
+    .join {
+      padding: clamp(120px, 14vw, 200px) clamp(20px, 6vw, 96px);
+      text-align: center;
+    }
+    .join h2 { margin: 0 auto; max-width: none; font-size: clamp(40px, 6.4vw, 104px); line-height: 0.98; letter-spacing: -0.04em; }
+    .join .cta { margin-top: clamp(36px, 4.5vw, 56px); }
+    .join .cta:hover { background: rgba(236, 236, 228, 0.12); border-color: var(--paper); }
+    .join p { margin-top: 20px; font-size: 15px; }
+
+    /* ---------- Apex takes the load ---------- */
+    .load {
+      padding: clamp(96px, 12vw, 160px) clamp(20px, 6vw, 96px);
+    }
+    .load h2 { margin: 0 auto; text-align: center; max-width: 20ch; }
+    .load-sub {
+      max-width: 40ch;
+      margin: clamp(18px, 2vw, 28px) auto 0;
+      text-align: center;
+      font-size: clamp(18px, 1.5vw, 22px);
+      line-height: 1.45;
+    }
+    .load-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr);
+      gap: clamp(28px, 4vw, 64px);
+      align-items: center;
+      max-width: 1320px;
+      margin: clamp(72px, 9vw, 128px) auto 0;
+    }
+    .load .stage { margin-top: 0; height: clamp(500px, 62vh, 620px); }
+    .load .you.apex img { width: 62%; height: auto; margin-top: -4%; }
+    /* You: larger and filled solid, so it stands out from the team. */
+    .load .you.me {
+      width: clamp(112px, 9.5vw, 132px);
+      font-size: clamp(24px, 2vw, 30px);
+      background: var(--paper);
+      color: var(--ink);
+    }
+    .load #stage2Lines line:last-child { stroke-width: 5; }
+
+    /* The log, in the same double-ruled style as the map boxes. */
+    .log {
+      border: 2px solid var(--paper);
+      outline: 1px solid var(--paper);
+      outline-offset: 5px;
+      padding: 26px 26px 20px;
+    }
+    .log-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+    .log-head small { font-weight: 500; font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; }
+    .log-head b { font-weight: 800; font-size: 13px; letter-spacing: 0.06em; }
+    .log-stats { display: flex; gap: 28px; margin-top: 14px; padding-bottom: 18px; border-bottom: 2px solid var(--paper); }
+    .log-stats div { display: grid; }
+    .log-stats strong { font-weight: 800; font-size: clamp(36px, 3.4vw, 52px); line-height: 1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+    .log-stats span { font-weight: 500; font-size: 13px; margin-top: 6px; }
+    .log ol {
+      list-style: none;
+      margin-top: 8px;
+      height: 330px;
+      overflow: hidden;
+      /* Older entries fade out at the bottom rather than getting cut off. */
+      -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent);
+              mask-image: linear-gradient(to bottom, #000 70%, transparent);
+    }
+    .log li {
+      display: grid;
+      grid-template-columns: 26px 1fr;
+      gap: 12px;
+      align-items: start;
+      padding: 12px 0;
+      font-size: 16px;
+      line-height: 1.35;
+      animation: logIn 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    }
+    .log li i {
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      border: 2px solid var(--paper);
+      display: grid;
+      place-items: center;
+      font-style: normal;
+      font-weight: 800;
+      font-size: 12px;
+    }
+    .log li.done i { background: var(--paper); }
+    .log li.done i::after {
+      content: "";
+      width: 9px; height: 5px;
+      border-left: 2.5px solid var(--ink);
+      border-bottom: 2.5px solid var(--ink);
+      transform: translateY(-1px) rotate(-45deg);
+    }
+    .log li.need b { display: block; font-weight: 800; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 2px; }
+    @keyframes logIn { from { opacity: 0; transform: translateY(-14px); } }
+
+    @media (max-width: 900px) {
+      .load-grid { grid-template-columns: 1fr; }
+      .log ol { height: 290px; }
+    }
+
+    /* The map's title, in the normal flow just above the pinned map. */
+    .route-title { padding: clamp(96px, 12vw, 160px) clamp(20px, 6vw, 96px) clamp(24px, 3vw, 40px); text-align: center; }
+    .route-title h2 { margin: 0 auto; max-width: none; }
+
+    /* ---------- The guide: a scroll-driven trail map ---------- */
+    /* The section is tall; the map pins to the screen while you scroll through it. */
+    .guide { position: relative; height: 820vh; }
+    .guide-stick {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      height: 100svh;
+      overflow: hidden;
+    }
+
+    /* The printed sheet: a fixed double-ruled frame. Only the terrain inside the window moves. */
+    .sheet {
+      position: absolute;
+      inset: clamp(24px, 5vh, 52px) clamp(20px, 5vw, 80px);
+      display: flex;
+      flex-direction: column;
+      border: 2px solid var(--paper);
+      outline: 1px solid var(--paper);
+      outline-offset: 6px;
+    }
+    /* Every box on the map sits the same distance in from the frame. */
+    .window { position: relative; flex: 1; overflow: hidden; --gap: 28px; }
+    #topo { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+    .contour { fill: none; stroke: rgba(236, 236, 228, 0.12); stroke-width: 0.9; vector-effect: non-scaling-stroke; }
+    .contour.index { stroke: rgba(236, 236, 228, 0.32); stroke-width: 1.4; }
+    .route-ghost { fill: none; stroke: rgba(236, 236, 228, 0.55); stroke-width: 2; stroke-dasharray: 1 7; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+    .route-ink { fill: none; stroke: var(--paper); stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round; }
+
+    /* Map labels: drawn in screen pixels and rescaled every frame so they stay the same size while zooming. */
+    .pin text {
+      fill: var(--paper);
+      font-family: "Inter Tight", system-ui, sans-serif;
+      font-weight: 800;
+      font-size: 13px;
+      letter-spacing: 0.12em;
+    }
+    .pin .ico { fill: none; stroke: var(--paper); stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; }
+    .pin .ring { fill: var(--ink); stroke: var(--paper); stroke-width: 2.5; }
+
+    /* The key, like the corner box on a printed map. */
+    .legend {
+      position: absolute;
+      top: var(--gap); right: var(--gap);
+      border: 2px solid var(--paper);
+      outline: 1px solid var(--paper);
+      outline-offset: 3px;
+      background: var(--ink);
+      padding: 14px 18px;
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      line-height: 1.7;
+    }
+    .legend b { display: block; font-size: 15px; letter-spacing: 0.08em; }
+    .legend em { display: block; font-style: italic; font-weight: 800; margin-bottom: 8px; letter-spacing: 0.1em; }
+    .legend i { display: inline-block; width: 22px; margin-right: 8px; font-style: normal; text-align: center; }
+    .legend i.n {
+      width: 18px; height: 18px;
+      margin: 0 10px 0 2px;
+      border: 2px solid var(--paper);
+      border-radius: 50%;
+      font-weight: 800;
+      font-size: 10px;
+      line-height: 14px;
+      letter-spacing: 0;
+      vertical-align: middle;
+    }
+    .legend .line { display: inline-block; width: 22px; height: 4px; background: var(--paper); vertical-align: middle; margin-right: 8px; }
+
+    /* Current location, top-left, in the same double-ruled style as the key. */
+    .here {
+      position: absolute;
+      top: var(--gap); left: var(--gap);
+      border: 2px solid var(--paper);
+      outline: 1px solid var(--paper);
+      outline-offset: 3px;
+      background: var(--ink);
+      padding: 12px 18px 13px 16px;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      column-gap: 12px;
+      align-items: center;
+      min-width: 230px;
+    }
+    .here .dot {
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: var(--paper);
+      box-shadow: 0 0 0 4px var(--ink), 0 0 0 6px var(--paper);
+    }
+    .here small { font-weight: 500; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; }
+    .here b { font-weight: 800; font-size: 17px; letter-spacing: -0.01em; transition: opacity 0.25s ease; }
+
+    /* The info panel is part of the map sheet: always there, bottom-right.
+       Only its contents change, one card per stop stacked in the same spot. */
+    .panel {
+      position: absolute;
+      right: var(--gap);
+      bottom: var(--gap);
+      width: min(560px, 46%);
+      display: grid;
+      border: 2px solid var(--paper);
+      outline: 1px solid var(--paper);
+      outline-offset: 5px;
+      background: var(--ink);
+    }
+    .card {
+      grid-area: 1 / 1;
+      padding: 32px 36px 34px;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s ease, visibility 0s linear 0.3s;
+    }
+    .card.open { opacity: 1; visibility: visible; transition: opacity 0.3s ease 0.1s; }
+    .card-head { display: flex; align-items: center; gap: 18px; }
+    .card .icon {
+      flex: none;
+      width: 64px; height: 64px;
+      border-radius: 50%;
+      border: 3px solid var(--paper);
+      display: grid;
+      place-items: center;
+    }
+    .card .icon svg { width: 28px; height: 28px; fill: none; stroke: var(--paper); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+    .card .icon img { width: 36px; height: auto; }
+    .card small { display: block; font-weight: 500; font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; }
+    .card h3 { margin-top: 4px; font-weight: 800; font-size: clamp(30px, 2.8vw, 44px); letter-spacing: -0.025em; line-height: 1.02; }
+    .card p { margin-top: 18px; font-size: clamp(17px, 1.35vw, 20px); line-height: 1.45; }
+    .card ul { list-style: none; margin-top: 16px; display: grid; gap: 10px; }
+    .card li {
+      position: relative;
+      padding-left: 22px;
+      font-size: clamp(15px, 1.15vw, 17px);
+      line-height: 1.4;
+    }
+    .card li::before {
+      content: "";
+      position: absolute;
+      left: 0; top: 0.5em;
+      width: 8px; height: 8px;
+      background: var(--paper);
+      transform: rotate(45deg);
+    }
+
+    /* North arrow and scale bar, bottom-left, like the corner of a printed map. */
+    .compass {
+      position: absolute;
+      left: calc(var(--gap) + 18px); bottom: calc(var(--gap) + 18px);
+      display: flex;
+      align-items: flex-end;
+      gap: 28px;
+      pointer-events: none;
+    }
+    .compass svg { display: block; }
+    .north { width: 50px; height: 78px; }
+    .north path { fill: var(--paper); }
+    .north path.half { fill: none; stroke: var(--paper); stroke-width: 2; }
+    .north text { fill: var(--paper); font-family: "Inter Tight", sans-serif; font-weight: 800; font-size: 14px; text-anchor: middle; }
+    .scale { display: grid; gap: 8px; width: 240px; }
+    .scale .bar { display: flex; border: 2px solid var(--paper); height: 13px; }
+    .scale .bar i { flex: 1; }
+    .scale .bar i:nth-child(odd) { background: var(--paper); }
+    /* 0 at the left end, 1 at the midpoint, 2 at the right end of the bar. */
+    .scale .marks { position: relative; height: 16px; font-weight: 500; font-size: 13px; letter-spacing: 0.1em; }
+    .scale .marks span { position: absolute; top: 0; }
+    .scale .marks span:nth-child(1) { left: 0; }
+    .scale .marks span:nth-child(2) { left: 50%; transform: translateX(-50%); }
+    .scale .marks span:nth-child(3) { right: 0; }
+
+    @media (max-width: 760px) {
+      .sheet { inset: 20px 16px; }
+      .legend { display: none; }
+      .window { --gap: 18px; }
+      .panel { left: var(--gap); width: auto; }
+      .card { padding: 20px 22px 22px; }
+      .card .icon { width: 48px; height: 48px; }
+      .card .icon svg { width: 22px; height: 22px; }
+      .card p { margin-top: 12px; }
+      .card ul { display: none; }
+      .here { min-width: 0; padding: 9px 14px 10px 12px; }
+      .here b { font-size: 15px; }
+      .compass { display: none; }
+    }
+
+    @media (max-width: 640px) {
+      .avatar { width: 52px; height: 52px; font-size: 15px; border-width: 2.5px; }
+      .chip { font-size: 13px; padding: 6px 12px 6px 6px; }
+      .chip i {
+      position: relative; width: 24px; height: 24px; font-size: 9.5px; }
+    }
+
+
+  </style>
+</head>
+<body>
+  <header class="site-head">
+    <a href="index.html"><img class="logo" src="img/logo/lockup.png" alt="Apex"></a>
+    <a class="seen" href="https://www.danmartell.com" target="_blank" rel="noopener">As seen from <b>Dan Martell</b></a>
+    <button class="burger" id="burger" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="menu"><span></span><span></span><span></span></button>
+  </header>
+
+  <nav class="menu" id="menu" aria-label="Site">
+    <ul>
+      <li><a href="index.html" style="--i: 0">Home</a></li>
+      <li><a href="subpage.html" style="--i: 1">How it works</a></li>
+      <li><a href="#for" style="--i: 1.5">Who it’s for</a></li>
+      <li><a href="#join" style="--i: 2">Join the waitlist</a></li>
+      <li><a href="mailto:support@apex.host" style="--i: 3">Contact</a></li>
+    </ul>
+  </nav>
+  <section class="hero">
+    <img src="img/hero-climber.jpg" alt="A climber carrying skis up a steep snow slope above a range of peaks and clouds.">
+    <div class="hero-copy">
+      <h1>You don’t have to do it all alone.</h1>
+      <a class="cta" href="subpage.html">Find out how we can help</a>
+    </div>
+  </section>
+
+  <section class="waiting" id="waiting">
+    <h2>We know what it’s like to have a whole team and yet still feel like all the work rests on you.</h2>
+
+    <div class="stage" id="stage" aria-hidden="true">
+      <svg id="stageLines"></svg>
+      <div class="you" id="you">You</div>
+    </div>
+  </section>
+
+  <section class="band">
+    <img src="img/summit.jpg" alt="A lone climber on a snowy mountain ridge with ranges stretching to the horizon.">
+    <h2>Apex can help you find the freedom you’ve been missing.</h2>
+  </section>
+
+  <section class="ask" id="ask">
+    <h2>It works with the AI you already use.</h2>
+    <p class="lead">Apex brings the memory. Then it does the work.</p>
+    <div class="claude play">
+      <div class="win-bar"><span class="dots"><i></i><i></i><i></i></span><span class="url">claude.ai/new</span></div>
+      <div class="claude-top"><b>Claude</b><span class="conn"><img src="img/logo/icon.png" alt="">Apex connected</span></div>
+      <div class="chat">
+        <div class="me" data-t="300">Who’s waiting on me this week?</div>
+        <div class="used" data-t="1300">Used Apex <em>· searched Gmail, Slack, HubSpot</em></div>
+        <div class="says" data-t="2300">Three people, and one is overdue:
+          <ul>
+            <li><b>Dana at Northwind</b>: the security review you promised 11 days ago</li>
+            <li><b>Marcus</b>: pricing for the 500-seat tier</li>
+            <li><b>Priya</b>: an intro to the Harbour team</li>
+          </ul>
+        </div>
+        <div class="me" data-t="4200">Send Dana the review and move the deal.</div>
+        <div class="used" data-t="5200">Used Apex <em>· took 3 actions</em></div>
+        <div class="says" data-t="6100">Done.
+          <ul class="done">
+            <li>✓ Review sent to Dana<span>Gmail</span></li>
+            <li>✓ Northwind moved to Proposal sent<span>HubSpot</span></li>
+            <li>✓ Follow-up set for Friday<span>Calendar</span></li>
+          </ul>
+        </div>
+      </div>
+      <div class="claude-input">Reply to Claude…</div>
+    </div>
+    <a class="more" href="subpage.html">See how it works</a>
+  </section>
+
+  <script>
+    // The chat plays once it's on screen and resets when it leaves, so it replays on the way back.
+    (function () {
+      var reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+      document.querySelectorAll(".play").forEach(function (demo) {
+        var timers = [], items = demo.querySelectorAll("[data-t]");
+        new IntersectionObserver(function (es) {
+          es.forEach(function (e) {
+            timers.forEach(clearTimeout);
+            timers = [];
+            if (e.isIntersecting) {
+              items.forEach(function (el) {
+                timers.push(setTimeout(function () { el.classList.add("in"); }, reduce ? 0 : +el.dataset.t));
+              });
+            } else {
+              items.forEach(function (el) { el.classList.remove("in"); });
+            }
+          });
+        }, { threshold: 0.4 }).observe(demo);
+      });
+    })();
+  </script>
+
+  <section class="route-title">
+    <h2>Your route to the summit.</h2>
+  </section>
+
+  <section class="guide" id="guide">
+    <div class="guide-stick">
+      <div class="sheet">
+      <div class="window">
+      <svg id="topo" aria-hidden="true">
+        <g id="contours"></g>
+        <path class="route-ghost" id="routeGhost"/>
+        <path class="route-ink" id="routeInk"/>
+        <g id="pins"></g>
+      </svg>
+
+      <div class="here" aria-live="polite">
+        <span class="dot"></span>
+        <b id="hereName">Trailhead</b>
+      </div>
+
+      <div class="legend" id="legend">
+        <b>The Apex Route</b>
+        <em>4 camps</em>
+        <div><span class="line"></span>Route</div>
+        <div><i class="n"></i>Camp</div>
+      </div>
+
+      <div class="panel">
+      <div class="card" data-stop="-1">
+        <div class="card-head">
+          <div class="icon"><img src="img/logo/icon.png" alt=""></div>
+          <div><h3>You’re about to embark on a journey</h3></div>
+        </div>
+        <p>Scroll to see how Apex Vega can help you get above the chaos and to the summit of freedom.</p>
+      </div>
+      <div class="card" data-stop="0">
+        <div class="card-head">
+          <div class="icon"><svg viewBox="0 0 24 24"><path d="M12 3v18M9 21h6M5 5.5h10.5L18 8l-2.5 2.5H5zM19 12.5H8.5L6 15l2.5 2.5H19z"/></svg></div>
+          <div><h3>The trailhead</h3></div>
+        </div>
+        <p>Right now every email, invoice and decision runs through you. This is where the climb begins.</p>
+        <ul><li>Your team is waiting on you</li><li>Your tools don’t talk to each other</li><li>Your AI forgets everything between chats</li></ul>
+      </div>
+      <div class="card" data-stop="1">
+        <div class="card-head">
+          <div class="icon"><svg viewBox="0 0 24 24"><path d="M12 4 3 20h18zM9.5 20 12 14l2.5 6M12 4l-1.6-2M12 4l1.6-2"/></svg></div>
+          <div><h3>Connect your tools</h3></div>
+        </div>
+        <p>Sign in once to the tools you already use. Nothing to install, nothing to maintain.</p>
+        <ul><li>Gmail, Calendar, Slack, HubSpot and 1,379 more</li><li>Read access to start, and you choose what each tool can see</li><li>Self-hosted, and you own 100% of it</li></ul>
+      </div>
+      <div class="card" data-stop="2">
+        <div class="card-head">
+          <div class="icon"><svg viewBox="0 0 24 24"><path d="M3 6.5 9 4l6 2.5L21 4v13.5L15 20l-6-2.5L3 20zM9 4v13.5M15 6.5V20"/></svg></div>
+          <div><h3>It remembers</h3></div>
+        </div>
+        <p>Every update in every connected tool paints a clearer picture of your business.</p>
+        <ul><li>The people, companies, meetings, deals and promises</li><li>The same person across Gmail, Slack and HubSpot is one person</li><li>Nothing to file, tag or tidy</li></ul>
+      </div>
+      <div class="card" data-stop="3">
+        <div class="card-head">
+          <div class="icon"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0zM14.8 9.2l-1.9 4.5-4.6 1.9 1.9-4.5z"/></svg></div>
+          <div><h3>Ask your LLM</h3></div>
+        </div>
+        <p>Apex works with the AI you already use, so you’re never tied to one tool. It brings the brain and the context to the table you’ve already set.</p>
+        <ul><li>Claude, ChatGPT and Grok all read the same memory</li><li>Switch models and pick up where you left off</li><li>No tool dependency: switch LLMs any time, because the brain is Apex</li></ul>
+      </div>
+      <div class="card" data-stop="4">
+        <div class="card-head">
+          <div class="icon"><svg viewBox="0 0 24 24"><path d="M4 21l16-4M4 17l16 4M12 15c-2.8 0-4.5-1.9-4.5-4.3 0-2.9 2.6-3.8 2.6-7.2 2 1.2 6.4 3.6 6.4 7.4 0 2.3-1.7 4.1-4.5 4.1z"/></svg></div>
+          <div><h3>It takes action</h3></div>
+        </div>
+        <p>Apex does the work you would’ve otherwise done yourself, right inside the tools you already use.</p>
+        <ul><li>Sends the message, updates the deal, books the meeting</li><li>Every action is logged with the tool and who asked</li><li>Anything that fails is flagged, so nothing slips</li></ul>
+      </div>
+      <div class="card" data-stop="5">
+        <div class="card-head">
+          <div class="icon"><img src="img/logo/icon.png" alt=""></div>
+          <div><h3>Achieve your freedom</h3></div>
+        </div>
+        <p>The business runs. You lead it.</p>
+        <ul><li>Time back for the work only you can do</li><li>Dinner without your phone buzzing</li><li>The owner other owners ask about AI</li></ul>
+      </div>
+      </div>
+      <div class="compass" aria-hidden="true">
+        <svg class="north" viewBox="0 0 40 62">
+          <text x="20" y="14">N</text>
+          <path d="M20 20 L31 58 L20 50 Z"/>
+          <path class="half" d="M20 20 L9 58 L20 50 Z"/>
+        </svg>
+        <div class="scale">
+          <div class="bar"><i></i><i></i><i></i><i></i></div>
+          <div class="marks"><span>0</span><span>1</span><span>2 km</span></div>
+        </div>
+      </div>
+      </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band low">
+    <img src="img/ridges.jpg" alt="Layered mountain peaks rising above dark, snow-streaked ridges.">
+    <h2>Every summit has a guide.<br>Apex could be yours.</h2>
+  </section>
+
+  <section class="load" id="load">
+    <h2>Watch how Apex Vega handles the chaos.</h2>
+    <p class="load-sub">It works like you, for you, so only the things that require your attention come your way.</p>
+
+    <div class="load-grid">
+      <div class="stage" id="stage2" aria-hidden="true">
+        <svg id="stage2Lines"></svg>
+        <div class="you apex" id="apexNode"><img src="img/logo/stack.png" alt="Apex"></div>
+        <div class="you me" id="meNode">You</div>
+      </div>
+
+      <div class="log">
+        <div class="log-head"><small>Done by Apex</small><b>Today</b></div>
+        <div class="log-stats">
+          <div><strong id="doneCount">0</strong><span>handled for you</span></div>
+          <div><strong id="needCount">0</strong><span>need your call</span></div>
+        </div>
+        <ol id="logList" aria-live="off"></ol>
+      </div>
+    </div>
+  </section>
+
+
+
+  <section class="for" id="for">
+    <h2>See how Apex works for:</h2>
+    <ul class="who">
+      <li><a href="for/agencies.html"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16v11H4zM9 8V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V8M4 13h16"/></svg></span>Agency owners<span class="go" aria-hidden="true">→</span></a></li>
+      <li><a href="for/saas.html"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H4zM2 19h20M10 9l-2 2 2 2M14 9l2 2-2 2"/></svg></span>SaaS founders<span class="go" aria-hidden="true">→</span></a></li>
+      <li><a href="for/multi-business.html"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21V10l6-3v14M9 21V4l9 3.5V21M2 21h20M12.5 10h2.5M12.5 13.5h2.5M12.5 17h2.5"/></svg></span>Multi-business founders<span class="go" aria-hidden="true">→</span></a></li>
+      <li><a href="for/trades.html"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3.5 17.5l3 3 5.8-5.8a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg></span>Trades &amp; services<span class="go" aria-hidden="true">→</span></a></li>
+      <li><a href="for/creators.html"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h12v10H3zM15 10.5 21 7v10l-6-3.5"/></svg></span>Creators<span class="go" aria-hidden="true">→</span></a></li>
+      <li><a href="for/coaches.html"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h12v8H8l-5 4zM18 9h3v8l-3-2.5h-5V13"/></svg></span>Coaches &amp; consultants<span class="go" aria-hidden="true">→</span></a></li>
+    </ul>
+  </section>
+
+  <section class="join" id="join">
+    <h2>Peace of mind is waiting.</h2>
+    <a class="cta" href="#">Join the waitlist</a>
+  </section>
+
+  <footer class="site-foot">
+    <a href="index.html"><img src="img/logo/lockup-host.png" alt="Apex.host, home"></a>
+    <nav><a href="index.html">Home</a><span>© 2026 Apex.host</span></nav>
+  </footer>
+
+  <script>
+    // The same team, rewired: requests fly into Apex, Apex handles them and logs what it did.
+    // Only a real decision carries on from Apex to you.
+    (function () {
+      var stage = document.getElementById("stage2");
+      var svg = document.getElementById("stage2Lines");
+      var apex = document.getElementById("apexNode");
+      var me = document.getElementById("meNode");
+      var list = document.getElementById("logList");
+      var doneEl = document.getElementById("doneCount"), needEl = document.getElementById("needCount");
+      var NS = "http://www.w3.org/2000/svg";
+      var FACE = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="9.6" r="4.3"/><path d="M3.6 26c0-6.2 3.8-10 8.4-10s8.4 3.8 8.4 10z"/></svg>';
+
+      // [what they ask, what Apex did]; no answer means it needs you.
+      var TEAM = [
+        [["Can I send the proposal?", "Proposal sent to Northwind"], ["Can you call the lead?", "Call with the lead booked for Thursday"], ["Is this discount OK?"]],
+        [["Where’s that invoice?", "Invoice found and sent to Marcus"], ["Can we update the forecast?", "Deal stages updated in HubSpot"], ["Approve the Q3 budget?"]],
+        [["What did we agree?", "Meeting notes sent to Priya"], ["Who owns this?", "Answered from last week’s call"]],
+        [["Did the client reply?", "Reply found and forwarded to Ana"], ["Can you chase the sponsor?", "Follow-up sent to the sponsor"]],
+        [["Any update on the review?", "Status update sent to Northwind"], ["Can we get on a call?", "Call booked, agenda sent"], ["Can you sign the contract?"]]
+      ];
+      var people = [], w = 0, cx = 0, cy = 0, meX = 0, meY = 0, turn = 0, timer = null, done = 0, need = 0;
+
+      TEAM.forEach(function (asks) {
+        var el = document.createElement("div");
+        el.className = "person";
+        el.innerHTML = '<div class="avatar"><span class="face">' + FACE + "</span></div>";
+        stage.appendChild(el);
+        var line = document.createElementNS(NS, "line");
+        svg.appendChild(line);
+        people.push({ asks: asks, el: el, line: line, n: 0, x: 0, y: 0 });
+      });
+      var meLine = document.createElementNS(NS, "line");
+      svg.appendChild(meLine);
+
+      // Five people round the top of the ring; you sit at the bottom, on a single line from Apex.
+      function layout() {
+        w = stage.clientWidth;
+        var h = stage.clientHeight;
+        cx = w / 2; cy = h * 0.46;
+        var rx = Math.min(w * 0.4, 360), ry = h * 0.4;
+        people.forEach(function (p, k) {
+          var a = -Math.PI / 2 + (k < 3 ? k : k + 1) * (Math.PI / 3);
+          p.x = cx + Math.cos(a) * rx; p.y = cy + Math.sin(a) * ry;
+          p.el.style.left = p.x + "px"; p.el.style.top = p.y + "px";
+          p.line.setAttribute("x1", p.x); p.line.setAttribute("y1", p.y);
+          p.line.setAttribute("x2", cx); p.line.setAttribute("y2", cy);
+        });
+        meX = cx; meY = cy + ry;
+        me.style.left = meX + "px"; me.style.top = meY + "px";
+        meLine.setAttribute("x1", cx); meLine.setAttribute("y1", cy);
+        meLine.setAttribute("x2", meX); meLine.setAttribute("y2", meY);
+        apex.style.left = cx + "px"; apex.style.top = cy + "px";
+      }
+
+      function log(text, needsYou) {
+        var li = document.createElement("li");
+        li.className = needsYou ? "need" : "done";
+        li.innerHTML = needsYou ? "<i>!</i><span><b>Needs you</b>" + text + "</span>" : "<i></i><span>" + text + "</span>";
+        list.insertBefore(li, list.firstChild);
+        while (list.children.length > 7) list.removeChild(list.lastChild);
+        if (needsYou) needEl.textContent = ++need; else doneEl.textContent = ++done;
+      }
+
+      function fly(text, x0, y0, x1, y1, dur, cb) {
+        var chip = document.createElement("div");
+        chip.className = "chip";
+        chip.innerHTML = '<i><span class="face">' + FACE + "</span></i><span>" + text + "</span>";
+        stage.appendChild(chip);
+        var half = chip.offsetWidth / 2 + 8;
+        var cl = function (x) { return Math.min(w - half, Math.max(half, x)); };
+        var at = function (k, sc) { return "translate(" + cl(x0 + (x1 - x0) * k) + "px," + (y0 + (y1 - y0) * k) + "px) translate(-50%,-50%) scale(" + sc + ")"; };
+        var anim = chip.animate([
+          { transform: at(0, 0.9), opacity: 0 },
+          { transform: at(0.08, 1), opacity: 1, offset: 0.1 },
+          { transform: at(0.82, 1), opacity: 1, offset: 0.86 },
+          { transform: at(1, 0.5), opacity: 0 }
+        ], { duration: dur, easing: "linear", fill: "forwards" });
+        anim.onfinish = function () { chip.remove(); cb(); };
+        return anim;
+      }
+
+      function send(ahead) {
+        var p = people[[0, 3, 1, 4, 2][turn++ % people.length]];
+        var item = p.asks[p.n++ % p.asks.length];
+        var sx = p.x + (cx - p.x) * 0.22, sy = p.y + (cy - p.y) * 0.22;
+        var anim = fly(item[0], sx, sy, cx, cy, 3000, function () {
+          if (item[1]) log(item[1], false);
+          else fly(item[0], cx, cy, meX, meY, 1800, function () { log(item[0], true); });
+        });
+        if (ahead) anim.currentTime = ahead;
+      }
+
+      var started = false;
+      function start() {
+        if (timer) return;
+        if (!started) {
+          started = true;
+          send(2000);
+          send(700);
+        }
+        timer = setInterval(send, 1700);
+      }
+      function stop() { clearInterval(timer); timer = null; }
+
+      layout();
+      addEventListener("resize", layout);
+      if (document.fonts) document.fonts.ready.then(layout);
+
+      // Open on a day already under way.
+      ["Invoice found and sent to Marcus", "Meeting notes sent to Priya", "Status update sent to Northwind", "Deal stages updated in HubSpot"].forEach(function (t) { log(t, false); });
+      done = 23; doneEl.textContent = done;
+      log("Is this discount OK?", true);
+
+      if (matchMedia("(prefers-reduced-motion: reduce)").matches || !stage.animate) return;
+      new IntersectionObserver(function (es) {
+        es.forEach(function (e) { e.isIntersecting ? start() : stop(); });
+      }, { rootMargin: "100% 0px 100% 0px" }).observe(stage);
+    })();
+  </script>
+
+  <script>
+    // The trail map. One sticky screen; scrolling through the tall section drives a camera over a
+    // generated topographic map, inks the route leg by leg, and opens a card at each camp.
+    (function () {
+      var NS = "http://www.w3.org/2000/svg";
+      var MW = 1600, MH = 1000;
+      var section = document.getElementById("guide");
+      var svg = document.getElementById("topo");
+      var ink = document.getElementById("routeInk");
+      var ghost = document.getElementById("routeGhost");
+      var pinsG = document.getElementById("pins");
+      var cards = Array.prototype.slice.call(document.querySelectorAll(".card"));
+
+      function el(tag, attrs, parent) {
+        var e = document.createElementNS(NS, tag);
+        for (var k in attrs) e.setAttribute(k, attrs[k]);
+        if (parent) parent.appendChild(e);
+        return e;
+      }
+
+      // ---- Terrain: a few peaks plus gentle noise, highest at the summit. ----
+      var PEAKS = [
+        [1250, 230, 1.0, 300], [1250, 232, 0.55, 110], [1250, 232, 0.3, 45], [1010, 380, 0.36, 170], [760, 470, 0.38, 200], [470, 300, 0.5, 160],
+        [1370, 660, 0.45, 170], [240, 240, 0.34, 140], [640, 860, 0.28, 190], [1500, 110, 0.4, 150], [180, 620, 0.22, 150],
+        // Smaller knolls and spurs for texture.
+        [880, 250, 0.16, 70], [560, 520, 0.12, 60], [1150, 520, 0.14, 80], [340, 420, 0.13, 70], [1460, 400, 0.15, 90],
+        [960, 760, 0.12, 90], [1180, 900, 0.14, 80], [60, 380, 0.14, 90], [700, 120, 0.16, 90], [420, 980, 0.1, 80],
+        [1560, 820, 0.12, 70], [260, 60, 0.12, 80], [1020, 60, 0.12, 70], [100, 900, 0.1, 70]
+      ];
+      function height(x, y) {
+        var h = 0;
+        for (var i = 0; i < PEAKS.length; i++) {
+          var p = PEAKS[i], dx = x - p[0], dy = y - p[1];
+          h += p[2] * Math.exp(-(dx * dx + dy * dy) / (2 * p[3] * p[3]));
+        }
+        h += 0.035 * (Math.sin(x * 0.013 + y * 0.007) + Math.sin(x * 0.006 - y * 0.017 + 1.3) + Math.sin((x + y) * 0.011 + 2.1));
+        // Finer ground texture on top.
+        h += 0.016 * (Math.sin(x * 0.029 + y * 0.013 + 0.7) + Math.sin(x * 0.017 - y * 0.031 + 2.4));
+        h += 0.007 * Math.sin(x * 0.061 + Math.cos(y * 0.047) * 2);
+        return h;
+      }
+
+      // ---- Contours by marching squares. Every fifth level is an index contour, drawn heavier. ----
+      (function contours() {
+        // Well past the route in every direction; taller still on portrait screens.
+        var tall = innerHeight > innerWidth;
+        var G = 8, X0 = -500, Y0 = tall ? -1300 : -500, NX = Math.ceil((MW + 1000) / G), NY = Math.ceil((MH + (tall ? 2600 : 1000)) / G);
+        var f = [];
+        for (var j = 0; j <= NY; j++) { f[j] = []; for (var i = 0; i <= NX; i++) f[j][i] = height(X0 + i * G, Y0 + j * G); }
+        var group = document.getElementById("contours");
+        // Contour levels run from the lowest ground right up to the highest peak, so no summit is left blank.
+        var hmax = -Infinity;
+        for (var jj = 0; jj <= NY; jj++) for (var ii = 0; ii <= NX; ii++) if (f[jj][ii] > hmax) hmax = f[jj][ii];
+        var STEP = 0.036, LEVELS = Math.ceil((hmax + 0.08) / STEP) - 1;
+        for (var L = 1; L <= LEVELS; L++) {
+          var lv = -0.08 + L * STEP, d = [];
+          for (var j2 = 0; j2 < NY; j2++) {
+            for (var i2 = 0; i2 < NX; i2++) {
+              var a = f[j2][i2], b = f[j2][i2 + 1], c = f[j2 + 1][i2 + 1], e = f[j2 + 1][i2];
+              var idx = (a > lv ? 8 : 0) | (b > lv ? 4 : 0) | (c > lv ? 2 : 0) | (e > lv ? 1 : 0);
+              if (idx === 0 || idx === 15) continue;
+              var x = X0 + i2 * G, y = Y0 + j2 * G;
+              var top = [x + G * (lv - a) / (b - a), y], right = [x + G, y + G * (lv - b) / (c - b)];
+              var bot = [x + G * (lv - e) / (c - e), y + G], left = [x, y + G * (lv - a) / (e - a)];
+              var segs = {1: [left, bot], 2: [bot, right], 3: [left, right], 4: [top, right], 5: [left, top, bot, right],
+                6: [top, bot], 7: [left, top], 8: [left, top], 9: [top, bot], 10: [left, bot, top, right],
+                11: [top, right], 12: [left, right], 13: [bot, right], 14: [left, bot]}[idx];
+              for (var s = 0; s < segs.length; s += 2) {
+                d.push("M" + segs[s][0].toFixed(1) + " " + segs[s][1].toFixed(1) + "L" + segs[s + 1][0].toFixed(1) + " " + segs[s + 1][1].toFixed(1));
+              }
+            }
+          }
+          el("path", { d: d.join(""), "class": "contour" + (L % 5 === 0 ? " index" : "") }, group);
+        }
+      })();
+
+      // ---- The route: a smooth curve through switchbacks, passing each camp. ----
+      var WAY = [[160, 890], [250, 860], [330, 790], [420, 720], [500, 700], [570, 650], [660, 600],
+        [700, 560], [780, 545], [840, 505], [900, 470], [960, 435], [1010, 412], [1045, 372], [1100, 340],
+        [1150, 322], [1180, 285], [1220, 262], [1250, 232]];
+      var STOPS = [3, 6, 10, 14, 18]; // indexes in WAY for camps 1 to 4 and the summit
+      var d = "M" + WAY[0][0] + " " + WAY[0][1];
+      for (var i = 0; i < WAY.length - 1; i++) {
+        var a = WAY[i - 1] || WAY[i], b = WAY[i], c = WAY[i + 1], e = WAY[i + 2] || c;
+        d += "C" + (b[0] + (c[0] - a[0]) / 6) + " " + (b[1] + (c[1] - a[1]) / 6) + " " + (c[0] - (e[0] - b[0]) / 6) + " " + (c[1] - (e[1] - b[1]) / 6) + " " + c[0] + " " + c[1];
+      }
+      ink.setAttribute("d", d);
+      ghost.setAttribute("d", d);
+      var TOTAL = ink.getTotalLength();
+      ink.style.strokeDasharray = TOTAL;
+
+      // How far along the route each stop sits.
+      var stopLen = STOPS.map(function (k) {
+        var target = WAY[k], best = 0, bestD = 1e9;
+        for (var L = 0; L <= TOTAL; L += 2) {
+          var pt = ink.getPointAtLength(L), dd = (pt.x - target[0]) * (pt.x - target[0]) + (pt.y - target[1]) * (pt.y - target[1]);
+          if (dd < bestD) { bestD = dd; best = L; }
+        }
+        return best;
+      });
+
+      // ---- Pins: camps, trailhead, summit and region names. Drawn in screen pixels. ----
+      var pins = [];
+      function pin(x, y, build) {
+        var g = el("g", { "class": "pin" }, pinsG);
+        build(g);
+        pins.push({ g: g, x: x, y: y });
+      }
+      // Each stop is a ringed camping icon: signpost, tent, trail map, compass, campfire.
+      var ICONS = {
+        sign: "M12 3v18M9 21h6M5 5.5h10.5L18 8l-2.5 2.5H5zM19 12.5H8.5L6 15l2.5 2.5H19z",
+        tent: "M12 4 3 20h18zM9.5 20 12 14l2.5 6M12 4l-1.6-2M12 4l1.6-2",
+        map: "M3 6.5 9 4l6 2.5L21 4v13.5L15 20l-6-2.5L3 20zM9 4v13.5M15 6.5V20",
+        compass: "M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0zM14.8 9.2l-1.9 4.5-4.6 1.9 1.9-4.5z",
+        fire: "M4 21l16-4M4 17l16 4M12 15c-2.8 0-4.5-1.9-4.5-4.3 0-2.9 2.6-3.8 2.6-7.2 2 1.2 6.4 3.6 6.4 7.4 0 2.3-1.7 4.1-4.5 4.1z"
+      };
+      function marker(g, icon) {
+        el("circle", { "class": "ring", r: 19 }, g);
+        el("path", { "class": "ico", d: ICONS[icon], transform: "translate(-11 -11) scale(0.92)" }, g);
+      }
+      ["tent", "map", "compass", "fire"].forEach(function (icon, n) {
+        var k = STOPS[n];
+        pin(WAY[k][0], WAY[k][1], function (g) { marker(g, icon); });
+      });
+      pin(WAY[18][0], WAY[18][1], function (g) {
+        el("circle", { "class": "ring", r: 19 }, g);
+        el("image", { href: "img/logo/icon.png", x: -11, y: -12, width: 22, height: 23.7 }, g);
+      });
+      pin(WAY[0][0], WAY[0][1], function (g) { marker(g, "sign"); });
+
+      // ---- The camera: keyframes over scroll progress. ----
+      // w: map units across the screen; fx, fy: where the focus point sits on screen.
+      var W = 0, H = 0, mobile = false;
+      // The overview frames the whole route inside the window, with a little room around it.
+      function overview() {
+        var x0 = 160, x1 = 1250, y0 = 190, y1 = 890;
+        var w = Math.max((x1 - x0) * 1.35, (y1 - y0) * 1.3 * (W / H));
+        // Sit the route up and to the left, clear of the info panel in the bottom-right corner.
+        return { x: (x0 + x1) / 2, y: (y0 + y1) / 2, w: w, fx: mobile ? 0.5 : 0.4, fy: mobile ? 0.4 : 0.44 };
+      }
+      // Stops in order: the trailhead, camps 1 to 4, the summit. The card sits bottom-right,
+      // so the camera frames each stop up and to the left of it.
+      var STOP_PTS = [WAY[0]].concat(STOPS.map(function (k) { return WAY[k]; }));
+      var STOP_LEN = [0].concat(stopLen);
+      var STOP_NAMES = ["Trailhead", "Camp 01 · Connect", "Camp 02 · Remember", "Camp 03 · Ask", "Camp 04 · Act", "The summit of freedom"];
+      function at(n, zoom) {
+        var p = STOP_PTS[n];
+        return mobile ? { x: p[0], y: p[1], w: zoom * 0.62, fx: 0.5, fy: 0.26 } : { x: p[0], y: p[1], w: zoom, fx: 0.28, fy: 0.34 };
+      }
+      function keys() {
+        var o = overview(), K = [];
+        K.push({ t: 0, cam: o, len: 0, here: 0 });
+        K.push({ t: 0.05, cam: o, len: 0, here: 0 });
+        // Zoom into the trailhead first, then climb camp by camp.
+        K.push({ t: 0.13, cam: at(0, 600), len: 0, card: 0, here: 0 });
+        K.push({ t: 0.2, cam: at(0, 600), len: 0, card: 0, here: 0 });
+        for (var n = 1; n <= 4; n++) {
+          var arrive = 0.28 + (n - 1) * 0.145;
+          K.push({ t: arrive, cam: at(n, 600), len: STOP_LEN[n], card: n, here: n });
+          K.push({ t: arrive + 0.06, cam: at(n, 600), len: STOP_LEN[n], card: n, here: n });
+        }
+        K.push({ t: 0.87, cam: at(5, 680), len: TOTAL, card: 5, here: 5 });
+        K.push({ t: 0.93, cam: at(5, 680), len: TOTAL, card: 5, here: 5 });
+        K.push({ t: 0.985, cam: o, len: TOTAL, card: 5, here: 5 });
+        K.push({ t: 1, cam: o, len: TOTAL, card: 5, here: 5 });
+        return K;
+      }
+      var hereName = document.getElementById("hereName"), hereNow = "";
+      var K = [];
+
+      function ease(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+      function mix(a, b, t) { return a + (b - a) * t; }
+
+      function render() {
+        var r = section.getBoundingClientRect();
+        var p = Math.min(1, Math.max(0, -r.top / (r.height - innerHeight)));
+
+        // Find the two keyframes around p and blend between them.
+        var n = 0;
+        while (n < K.length - 2 && p > K[n + 1].t) n++;
+        var A = K[n], B = K[n + 1];
+        var t = ease(Math.min(1, Math.max(0, (p - A.t) / (B.t - A.t))));
+        var cam = {
+          x: mix(A.cam.x, B.cam.x, t), y: mix(A.cam.y, B.cam.y, t),
+          w: Math.exp(mix(Math.log(A.cam.w), Math.log(B.cam.w), t)),
+          fx: mix(A.cam.fx, B.cam.fx, t), fy: mix(A.cam.fy, B.cam.fy, t)
+        };
+        var vw = cam.w, vh = vw * H / W;
+        svg.setAttribute("viewBox", (cam.x - vw * cam.fx) + " " + (cam.y - vh * cam.fy) + " " + vw + " " + vh);
+
+        // Ink the route and keep labels a constant size on screen.
+        var len = mix(A.len, B.len, t);
+        ink.style.strokeDashoffset = TOTAL - len;
+        var k = vw / W;
+        ink.style.strokeWidth = 4.5 * k;
+        pins.forEach(function (pn) { pn.g.setAttribute("transform", "translate(" + pn.x + " " + pn.y + ") scale(" + k + ")"); });
+
+        // The card for the stop we're holding at.
+        // Keep the last stop's card while travelling, switch as we arrive at the next.
+        var open = t > 0.85 && B.card !== undefined ? B.card : (A.card !== undefined ? A.card : -1);
+        cards.forEach(function (c) { c.classList.toggle("open", +c.dataset.stop === open); });
+
+        // Current location: the last stop reached, switching as we arrive at the next.
+        var name = STOP_NAMES[t > 0.85 ? B.here : A.here];
+        if (name !== hereNow) { hereNow = name; hereName.textContent = name; }
+      }
+
+      function resize() {
+        var box = svg.parentNode.getBoundingClientRect();
+        W = box.width; H = box.height;
+        mobile = W < 760;
+        K = keys();
+        render();
+      }
+
+      var ticking = false;
+      addEventListener("scroll", function () {
+        if (!ticking) { ticking = true; requestAnimationFrame(function () { ticking = false; render(); }); }
+      }, { passive: true });
+      addEventListener("resize", resize);
+      resize();
+    })();
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/lenis@1.3.26/dist/lenis.min.js"></script>
+  <script>
+    // A refresh always lands on the hero, not wherever the page was left.
+    if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+    addEventListener("pageshow", function () { scrollTo(0, 0); });
+  </script>
+  <script>
+    // Smooth, weighted scrolling. Lenis eases the page's native scroll, so scrollY stays accurate.
+    if (!matchMedia("(prefers-reduced-motion: reduce)").matches && window.Lenis) {
+      window.lenis = new Lenis({ autoRaf: true, lerp: 0.075, wheelMultiplier: 0.9, anchors: true });
+    }
+  </script>
+  <script>
+    // The menu button toggles the full-screen menu; the page stops scrolling while it's open.
+    (function () {
+      var burger = document.getElementById("burger");
+      var menu = document.getElementById("menu");
+      function set(open) {
+        document.body.classList.toggle("menu-open", open);
+        document.documentElement.style.overflow = open ? "hidden" : "";
+        burger.setAttribute("aria-expanded", open);
+        burger.setAttribute("aria-label", open ? "Close menu" : "Open menu");
+        if (window.lenis) open ? window.lenis.stop() : window.lenis.start();
+      }
+      burger.addEventListener("click", function () { set(!document.body.classList.contains("menu-open")); });
+      menu.addEventListener("click", function (e) { if (e.target.closest("a")) set(false); });
+      addEventListener("keydown", function (e) { if (e.key === "Escape") set(false); });
+    })();
+    // Top bar: hide on the way down, fade back in on the way up.
+    (function () {
+      var head = document.querySelector(".site-head"), last = scrollY, ticking = false;
+      function update() {
+        ticking = false;
+        var y = scrollY;
+        if (y < 80) { head.classList.remove("away", "solid"); }
+        else if (y > last + 4) { head.classList.add("away"); }
+        else if (y < last - 4) { head.classList.remove("away"); head.classList.add("solid"); }
+        last = y;
+      }
+      addEventListener("scroll", function () {
+        if (!ticking) { ticking = true; requestAnimationFrame(update); }
+      }, { passive: true });
+    })();
+  </script>
+  <script>
+    // One task at a time travels slowly down a line from the person asking into you.
+    // Their badge counts up as each one lands.
+    (function () {
+      var stage = document.getElementById("stage");
+      var svg = document.getElementById("stageLines");
+      var you = document.getElementById("you");
+      var reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      var TEAM = [
+        { i: "SK", name: "Sarah, Sales", asks: ["Can I send the proposal?", "Is this discount OK?", "Can you call the lead?", "Which deal first?"] },
+        { i: "MR", name: "Marcus, Finance", asks: ["Approve the Q3 budget?", "Sign off on payroll?", "Pay this invoice?", "OK to renew the software?"] },
+        { i: "PN", name: "Priya, Ops", asks: ["Which vendor do we pick?", "OK to change the process?", "Can we hire for this?", "Who owns this?"] },
+        { i: "DV", name: "Dev team", asks: ["Ready to ship. Your call?", "Which feature first?", "Can you review this?", "Bug or feature?"] },
+        { i: "AL", name: "Ana, Marketing", asks: ["Does this post look right?", "Approve the ad spend?", "Which headline?", "OK to launch Friday?"] },
+        { i: "NW", name: "Client", asks: ["Any update on the review?", "Can we get on a call?", "Can you sign the contract?", "Where are we on this?"] }
+      ];
+      var NS = "http://www.w3.org/2000/svg";
+      var FACE = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="9.6" r="4.3"/><path d="M3.6 26c0-6.2 3.8-10 8.4-10s8.4 3.8 8.4 10z"/></svg>';
+      var people = [], started = false, w = 0, cx = 0, cy = 0, turn = 0, timer = null;
+
+      TEAM.forEach(function (t) {
+        var el = document.createElement("div");
+        el.className = "person";
+        el.innerHTML = '<div class="avatar"><span class="face">' + FACE + '</span><span class="badge">0</span></div>';
+        stage.appendChild(el);
+        var line = document.createElementNS(NS, "line");
+        svg.appendChild(line);
+        people.push({ t: t, el: el, line: line, badge: el.querySelector(".badge"), n: 0, ask: 0, x: 0, y: 0 });
+      });
+
+      function layout() {
+        w = stage.clientWidth;
+        var h = stage.clientHeight;
+        cx = w / 2; cy = h * 0.46;
+        var rx = Math.min(w * (w < 640 ? 0.36 : 0.4), 480), ry = h * 0.38;
+        people.forEach(function (p, k) {
+          var a = -Math.PI / 2 + (k / people.length) * Math.PI * 2;
+          p.x = cx + Math.cos(a) * rx;
+          p.y = cy + Math.sin(a) * ry;
+          p.el.style.left = p.x + "px";
+          p.el.style.top = p.y + "px";
+          p.line.setAttribute("x1", p.x); p.line.setAttribute("y1", p.y);
+          p.line.setAttribute("x2", cx); p.line.setAttribute("y2", cy);
+        });
+        you.style.left = cx + "px";
+        you.style.top = cy + "px";
+      }
+
+      function arrive(p) {
+        p.n++;
+        p.badge.textContent = p.n;
+        p.badge.classList.add("on");
+      }
+
+      function lerp(a, b, k) { return a + (b - a) * k; }
+
+      // ahead: start this pill partway along its line, in ms.
+      function send(ahead) {
+        // Go round the team in a shuffled but steady order.
+        var p = people[[0, 3, 1, 4, 2, 5][turn++ % people.length]];
+        var text = p.t.asks[p.ask++ % p.t.asks.length];
+        var chip = document.createElement("div");
+        chip.className = "chip";
+        chip.innerHTML = '<i><span class="face">' + FACE + "</span></i><span>" + text + "</span>";
+        stage.appendChild(chip);
+
+        // Leave the person (kept on screen) and travel steadily down the line into you.
+        var half = chip.offsetWidth / 2 + 8;
+        var clampX = function (x) { return Math.min(w - half, Math.max(half, x)); };
+        var sx = clampX(p.x + (cx - p.x) * 0.22), sy = p.y + (cy - p.y) * 0.22;
+        var at = function (x, y, sc) { return "translate(" + x + "px," + y + "px) translate(-50%,-50%) scale(" + sc + ")"; };
+        var pt = function (k, sc) { return at(clampX(lerp(sx, cx, k)), lerp(sy, cy, k), sc); };
+        var anim = chip.animate([
+          { transform: pt(0, 0.9), opacity: 0 },
+          { transform: pt(0.08, 1), opacity: 1, offset: 0.1 },
+          { transform: pt(0.82, 1), opacity: 1, offset: 0.86 },
+          { transform: pt(1, 0.5), opacity: 0 }
+        ], { duration: 3200, easing: "linear", fill: "forwards" });
+        if (ahead) anim.currentTime = ahead;
+        anim.onfinish = function () { chip.remove(); arrive(p); };
+      }
+
+      function start() {
+        if (timer) return;
+        if (!started) {
+          // First run: already mid-flow, with two pills partway down their lines.
+          started = true;
+          send(2200);
+          send(900);
+        }
+        timer = setInterval(send, 1600);
+      }
+      function stop() { clearInterval(timer); timer = null; }
+
+      layout();
+      addEventListener("resize", layout);
+      if (document.fonts) document.fonts.ready.then(layout);
+
+      if (reduce || !stage.animate) {
+        // Show where it ends up: everyone waiting.
+        people.forEach(function (p) { p.n = 3; p.badge.textContent = 3; p.badge.classList.add("on"); });
+        return;
+      }
+
+      // Fade the web in as it scrolls up: invisible as its top edge enters the screen,
+      // fully there once its centre reaches the middle of the screen.
+      var ticking = false;
+      function fade() {
+        ticking = false;
+        var r = stage.getBoundingClientRect(), vh = innerHeight;
+        var k = (vh - r.top) / (vh / 2 + r.height / 2);
+        stage.style.opacity = Math.min(1, Math.max(0, k));
+      }
+      addEventListener("scroll", function () {
+        if (!ticking) { ticking = true; requestAnimationFrame(fade); }
+      }, { passive: true });
+      addEventListener("resize", fade);
+      fade();
+
+      // The web opens already busy: everyone has something waiting on you.
+      [3, 5, 2, 4, 6, 3].forEach(function (n, k) {
+        var p = people[k];
+        p.n = n; p.badge.textContent = n; p.badge.classList.add("on");
+      });
+
+      // Get going a full screen before the web scrolls into view, and pause once it's far away.
+      new IntersectionObserver(function (es) {
+        es.forEach(function (e) { e.isIntersecting ? start() : stop(); });
+      }, { rootMargin: "100% 0px 100% 0px" }).observe(stage);
+    })();
+  </script>
+</body>
+</html>
