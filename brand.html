@@ -3,267 +3,371 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Apex Brand</title>
+  <title>Apex Brand Assets</title>
   <meta name="robots" content="noindex">
   <link rel="icon" href="img/logo/app-icon.png" type="image/png">
   <link rel="icon" href="img/logo/favicon.svg" type="image/svg+xml">
-  <link href="https://cdn.jsdelivr.net/npm/lenis@1.3.26/dist/lenis.css" rel="stylesheet">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
-      --ink: #1C3A28;
-      --paper: #ECECE4;
-      --soft: rgba(236, 236, 228, 0.7);
-      --pad: clamp(20px, 6vw, 96px);
+      --pine: #1c3a28;
+      --mist: #ecece4;
+      --soft: rgba(236, 236, 228, 0.72);
+      --line: rgba(236, 236, 228, 0.16);
+      --pad: clamp(20px, 5vw, 80px);
+      --r: 18px;
     }
-
     * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    body {
-      background: var(--ink);
-      color: var(--paper);
-      font-family: "Inter Tight", system-ui, sans-serif;
-      -webkit-font-smoothing: antialiased;
-      font-size: clamp(17px, 1.3vw, 20px);
-      line-height: 1.5;
-    }
+    html { scroll-behavior: smooth; }
+    body { background: var(--pine); color: var(--mist); font-family: "Inter", system-ui, sans-serif; -webkit-font-smoothing: antialiased; font-size: 17px; line-height: 1.5; }
     img { display: block; max-width: 100%; }
+    a { color: inherit; }
+    h1, h2 { font-weight: 800; letter-spacing: -0.035em; line-height: 1; }
+    h2 { font-size: clamp(34px, 4.6vw, 64px); text-transform: uppercase; }
+    h3 { font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--soft); margin-bottom: 18px; }
+    .lede { color: var(--soft); max-width: 52ch; margin-top: 18px; font-size: clamp(17px, 1.4vw, 20px); }
 
-    /* Top bar: hides on the way down, returns with a soft black fade on the way up. */
-    .site-head {
-      position: fixed; top: 0; left: 0; right: 0; z-index: 50;
-      padding: clamp(20px, 3vw, 36px) var(--pad) 16px;
-      transition: opacity 0.4s ease, transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
-    }
-    .site-head::before {
-      content: ""; position: absolute; inset: 0 0 -60px 0; z-index: -1; pointer-events: none;
-      background: linear-gradient(to bottom, rgba(28,58,40,0.92), rgba(28,58,40,0.6) 40%, rgba(28,58,40,0.25) 70%, rgba(28,58,40,0));
-      opacity: 0; transition: opacity 0.4s ease;
-    }
-    .site-head.solid::before { opacity: 1; }
-    .site-head.away { opacity: 0; transform: translateY(-14px); pointer-events: none; }
-    .site-head img { height: clamp(24px, 2.2vw, 30px); width: auto; }
+    /* Top bar */
+    .bar { position: sticky; top: 0; z-index: 50; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px var(--pad); background: rgba(28,58,40,0.92); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+    .bar img { height: 26px; width: auto; }
+    .bar nav { display: flex; gap: clamp(14px, 2vw, 28px); font-size: 14px; font-weight: 500; }
+    .bar nav a { text-decoration: none; color: var(--soft); transition: color .2s; }
+    .bar nav a:hover { color: var(--mist); }
 
-    section { position: relative; padding: clamp(110px, 14vw, 200px) var(--pad); }
-    h1, h2 { font-weight: 800; letter-spacing: -0.035em; line-height: 0.98; }
-    h2 { font-size: clamp(40px, 6vw, 96px); max-width: 14ch; }
-    .sub { font-size: clamp(19px, 1.7vw, 25px); color: var(--soft); max-width: 30ch; margin-top: clamp(20px, 2.4vw, 32px); line-height: 1.4; }
-    .center { text-align: center; }
-    .center h2, .center .sub { margin-left: auto; margin-right: auto; }
+    .btn { display: inline-flex; align-items: center; gap: 10px; background: var(--mist); color: var(--pine); font: inherit; font-weight: 700; font-size: 15px; text-decoration: none; padding: 13px 22px; border-radius: 999px; border: 0; cursor: pointer; transition: transform .2s; white-space: nowrap; }
+    .btn:hover { transform: translateY(-2px); }
+    .btn.ghost { background: transparent; color: var(--mist); border: 1.5px solid var(--line); }
+    .btn.sm { padding: 9px 16px; font-size: 14px; }
 
-    /* Gentle rise into view, once. */
-    .rise { opacity: 0; transform: translateY(24px); transition: opacity 0.9s ease, transform 1.1s cubic-bezier(0.2, 0.8, 0.2, 1); }
-    .rise.in { opacity: 1; transform: none; }
+    section { padding: clamp(64px, 9vw, 120px) var(--pad); position: relative; }
+    .head { margin-bottom: clamp(32px, 4vw, 56px); }
 
-    /* Full-bleed photo sections */
-    .shot { min-height: 100vh; min-height: 100svh; overflow: hidden; background: var(--ink); display: flex; align-items: flex-start; }
-    .shot > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: grayscale(1); }
-    .shot::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(28,58,40,0.8), rgba(28,58,40,0.3) 40%, rgba(28,58,40,0) 60%, rgba(28,58,40,0.5)); }
-    .shot > div { position: relative; z-index: 1; }
-    .shot.bottom { align-items: flex-end; }
-    .shot.bottom::after { background: linear-gradient(to bottom, rgba(28,58,40,0.1), rgba(28,58,40,0) 40%, rgba(28,58,40,0.9)); }
-    .cover h1 { font-size: clamp(50px, 8.4vw, 136px); max-width: 10ch; padding-top: clamp(40px, 8vh, 110px); }
+    /* Hero */
+    .hero { min-height: 82vh; min-height: 82svh; display: flex; flex-direction: column; justify-content: flex-start; padding-top: clamp(72px, 14vh, 160px); overflow: hidden; }
+    .hero > img.bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: grayscale(1); opacity: .5; }
+    .hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(28,58,40,.35), rgba(28,58,40,.05) 40%, var(--pine)); }
+    .hero > * { position: relative; z-index: 1; }
+    .hero h1 { font-size: clamp(64px, 15vw, 240px); line-height: .92; max-width: none; text-transform: uppercase; letter-spacing: -0.04em; }
+    .hero .cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 32px; }
 
-    /* The climb: three photos, three words */
-    .climb { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: clamp(56px, 7vw, 96px); }
-    .climb figure { position: relative; aspect-ratio: 3 / 4; border-radius: 22px; overflow: hidden; background: var(--ink); }
-    .climb img { width: 100%; height: 100%; object-fit: cover; filter: grayscale(1); }
-    .climb figure::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(28,58,40,0) 40%, rgba(28,58,40,0.92)); }
-        .climb figcaption { position: absolute; left: 24px; right: 24px; bottom: 22px; z-index: 2; }
-    .climb b { display: block; font-size: clamp(28px, 2.6vw, 40px); font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
-    .climb span { display: block; color: var(--soft); margin-top: 8px; }
+    /* My thoughts */
+    .thoughts { display: grid; grid-template-columns: 1fr minmax(0, 380px); gap: clamp(32px, 6vw, 96px); align-items: center; }
+    .thoughts .words h2 { margin-bottom: clamp(20px, 2.4vw, 32px); }
+    .thoughts .words p { color: var(--mist); max-width: 28ch; font-size: clamp(24px, 2.6vw, 38px); font-weight: 500; letter-spacing: -0.02em; line-height: 1.25; }
+    .thoughts img { width: 100%; border-radius: var(--r); aspect-ratio: 1 / 1; object-fit: cover; object-position: 50% 30%; }
 
-    /* Two audiences */
-    .who { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(40px, 6vw, 96px); margin-top: clamp(56px, 7vw, 96px); }
-    .who b { display: block; font-size: clamp(64px, 8vw, 128px); font-weight: 800; letter-spacing: -0.05em; line-height: 0.9; }
-    .who p { font-size: clamp(19px, 1.7vw, 25px); color: var(--soft); margin-top: 16px; max-width: 22ch; line-height: 1.35; }
-    .who p strong { color: var(--paper); font-weight: 800; }
+    /* Design with Claude: the skill download and the design system link */
+    .claude-btns { display: flex; flex-wrap: wrap; gap: 12px; }
+    .claude-note { margin-top: 18px; max-width: 52ch; color: var(--soft); font-size: 16px; }
+    @media (max-width: 640px) { .claude-btns .btn { width: 100%; justify-content: center; white-space: normal; } }
 
-    /* The mark */
-    .mark { background: var(--paper); color: var(--ink); }
-    .mark .sub { color: rgba(28, 58, 40, 0.72); }
-    .mark .icon { width: clamp(180px, 24vw, 340px); margin: 0 auto clamp(56px, 6vw, 80px); }
+    /* Downloads */
+    #downloads { padding-top: clamp(32px, 4vw, 56px); padding-bottom: clamp(32px, 4vw, 56px); }
+    .dl-btns { display: flex; flex-wrap: wrap; gap: 12px; }
+    .dl-btns .btn { white-space: normal; }
 
     /* Logos */
-    .logos { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; margin-top: clamp(56px, 7vw, 96px); }
-    .tile { border-radius: 22px; min-height: clamp(220px, 22vw, 320px); display: grid; place-items: center; padding: clamp(28px, 4vw, 56px); position: relative; overflow: hidden; }
-    .tile img { max-height: clamp(70px, 9vw, 150px); width: auto; max-width: 100%; position: relative; }
-    .tile.photo > img:first-child { position: absolute; inset: 0; width: 100%; height: 100%; max-height: none; object-fit: cover; }
-    .t-paper { background: var(--paper); }
-    .tile.photo > img:first-child { filter: grayscale(1); }
-    .tile.photo::after { content: ""; position: absolute; inset: 0; background: rgba(28, 58, 40, 0.82); }
-    .tile.photo > img + img { z-index: 1; }
-    .w6 { grid-column: span 6; } .w3 { grid-column: span 3; } .w2 { grid-column: span 2; } .w4 { grid-column: span 4; }
+    .group + .group { margin-top: clamp(40px, 5vw, 72px); }
+    .logo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+    .logo, .ph { border-radius: var(--r); overflow: hidden; border: 1px solid var(--line); }
+    .logo { display: flex; flex-direction: column; }
+    .logo .art { position: relative; aspect-ratio: 4 / 3; }
+    .logo .art img { position: absolute; inset: 14%; width: 72%; height: 72%; object-fit: contain; }
+    .logo.app .art img { inset: 18%; width: 64%; height: 64%; }
+    .logo.on-paper .art { background: var(--mist); }
+    .logo.on-pine .art { background: #15301f; }
+    figcaption { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; font-size: 14px; font-weight: 500; }
+    .logo figcaption, .ph figcaption { background: var(--pine); }
+    figcaption a { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; font-size: 13px; font-weight: 700; color: var(--mist); border: 1.5px solid var(--line); border-radius: 999px; padding: 7px 13px; white-space: nowrap; transition: background .2s, color .2s, border-color .2s; }
+    figcaption a:hover { background: var(--mist); color: var(--pine); border-color: var(--mist); }
+    .logo figcaption { flex: 1; }
 
     /* Colour */
-    .swatches { display: grid; grid-template-columns: 1fr 1fr; margin: clamp(56px, 7vw, 96px) calc(-1 * var(--pad)) calc(-1 * clamp(110px, 14vw, 200px)); }
-    .after-colour { padding-top: clamp(110px, 14vw, 200px) !important; }
-    .sw { min-height: clamp(300px, 34vw, 520px); padding: clamp(28px, 4vw, 64px) var(--pad); display: flex; flex-direction: column; justify-content: space-between; }
-    .sw b { font-size: clamp(26px, 2.4vw, 38px); font-weight: 800; letter-spacing: -0.03em; line-height: 1.05; }
-    .sw span { font-size: 15px; opacity: 0.75; }
-    .sw.green { background: var(--ink); }
-    .sw.paper { background: var(--paper); color: var(--ink); }
+    .swatches { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .sw { border-radius: var(--r); min-height: clamp(240px, 26vw, 380px); padding: clamp(22px, 3vw, 40px); display: flex; flex-direction: column; justify-content: space-between; border: 1px solid var(--line); font: inherit; text-align: left; cursor: pointer; }
+    .sw.pine { background: var(--pine); color: var(--mist); }
+    .sw.mist { background: var(--mist); color: var(--pine); }
+    .sw b { font-size: clamp(28px, 3vw, 44px); font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+    .sw span { display: block; font-size: 15px; opacity: .75; margin-top: 6px; font-variant-numeric: tabular-nums; }
+    .sw em { font-style: normal; font-size: 13px; font-weight: 700; opacity: .7; }
+    .ratio { display: flex; height: 14px; border-radius: 99px; overflow: hidden; margin-top: 14px; border: 1px solid var(--line); }
+    .ratio i { display: block; }
+
+    /* Type */
+    .type { display: grid; grid-template-columns: 1fr 1.4fr; gap: clamp(28px, 5vw, 80px); align-items: start; }
+    .type .aa { font-size: clamp(120px, 18vw, 260px); font-weight: 800; letter-spacing: -0.06em; line-height: .85; }
+    .weights { display: grid; gap: 4px; }
+    .weights div { font-size: clamp(22px, 2.6vw, 38px); letter-spacing: -0.02em; padding: 10px 0; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
+    .weights small { font-size: 13px; color: var(--soft); letter-spacing: 0; font-weight: 500; }
+
+    .type .fname { font-size: clamp(32px, 3.4vw, 52px); font-weight: 800; letter-spacing: -0.03em; line-height: 1; margin-top: 24px; }
+    .hier { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--line); }
+    .hier h4 { text-transform: uppercase; font-size: clamp(34px, 4vw, 58px); font-weight: 800; letter-spacing: -0.035em; line-height: 1; }
+    .hier h5 { font-size: clamp(20px, 2vw, 28px); font-weight: 700; letter-spacing: -0.02em; margin-top: 14px; }
+    .hier p { color: var(--soft); margin-top: 10px; max-width: 46ch; }
+    .alpha { margin-top: clamp(40px, 5vw, 72px); padding-top: 28px; border-top: 1px solid var(--line); font-size: clamp(22px, 3.4vw, 52px); font-weight: 500; letter-spacing: -0.02em; line-height: 1.25; color: var(--soft); word-break: break-all; }
+
+    .type-card { background: var(--mist); color: var(--pine); border-radius: calc(var(--r) + 6px); padding: clamp(28px, 5vw, 72px); }
+    .type-card .head { margin-bottom: clamp(28px, 4vw, 48px); }
+    .type-card .lede, .type-card .hier p, .type-card .weights small, .type-card .alpha { color: rgba(28, 58, 40, 0.72); }
+    .type-card .weights div, .type-card .hier, .type-card .alpha { border-color: rgba(28, 58, 40, 0.2); }
+    .type-card .btn { background: var(--pine); color: var(--mist); border: 0; }
+
+    /* Texture */
+    .tex-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .tex { border-radius: var(--r); overflow: hidden; border: 1px solid var(--line); }
+    .tex img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
+    .tex.mist figcaption { background: var(--mist); color: var(--pine); }
+    .tex.mist figcaption a { color: var(--pine); border-color: rgba(28,58,40,.25); }
+    .tex.mist figcaption a:hover { background: var(--pine); color: var(--mist); border-color: var(--pine); }
+    .tex.pine figcaption { background: var(--pine); }
 
     /* Photography */
-    .gallery { display: grid; grid-template-columns: 7fr 5fr; gap: 14px; margin-top: clamp(56px, 7vw, 96px); }
-    .gallery img { width: 100%; height: 100%; object-fit: cover; filter: grayscale(1); border-radius: 22px; aspect-ratio: 16 / 10; }
-    .gallery img:nth-child(2), .gallery img:nth-child(3) { aspect-ratio: auto; }
+    .ph-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+    .ph:nth-child(1), .ph:nth-child(2) { grid-column: span 3; }
+    .ph:nth-child(n+3) { grid-column: span 2; }
+    .ph img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; filter: grayscale(1); }
+    .ph:nth-child(1) img, .ph:nth-child(2) img { aspect-ratio: 16 / 9; }
 
-    /* Merch */
-    .merch { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: clamp(56px, 7vw, 96px); }
-    .merch img { width: 100%; border-radius: 22px; aspect-ratio: 4 / 3; object-fit: cover; }
+    /* In use */
+    .ex-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .ex { border-radius: var(--r); overflow: hidden; display: block; border: 1px solid var(--line); }
+    .ex img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; transition: transform .6s cubic-bezier(.2,.8,.2,1); }
+    .ex:hover img { transform: scale(1.03); }
+    /* Products */
+    .products { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto auto; gap: 12px; }
+    .products img { width: 100%; height: 100%; border-radius: var(--r); object-fit: cover; aspect-ratio: 4 / 3; }
+    .products .hoodie { grid-column: 1 / -1; aspect-ratio: 16 / 10; object-position: 50% 38%; }
+    .products .bottle { grid-row: span 2; aspect-ratio: auto; }
 
-    /* Close */
-    .close { text-align: center; align-items: center; justify-content: center; }
-    .close::after { background: linear-gradient(to bottom, var(--ink), rgba(28,58,40,0.55) 30%, rgba(28,58,40,0.65) 70%, var(--ink)); }
-    .close .stack { width: clamp(150px, 16vw, 220px); margin: 0 auto 44px; }
-    .close h2 { margin: 0 auto; }
+    footer { padding: 28px var(--pad); font-size: 13px; color: var(--soft); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
 
-    footer { background: var(--ink); padding: 28px var(--pad); font-size: 13px; color: var(--soft); }
+    .toast { position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 20px); background: var(--mist); color: var(--pine); font-weight: 700; font-size: 14px; padding: 10px 18px; border-radius: 99px; opacity: 0; pointer-events: none; transition: all .3s; z-index: 99; }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+    .rise { opacity: 0; transform: translateY(18px); transition: opacity .7s ease, transform .9s cubic-bezier(.2,.8,.2,1); }
+    .rise.in { opacity: 1; transform: none; }
 
     @media (max-width: 900px) {
-      .climb { grid-template-columns: 1fr; }
-      .climb figure { aspect-ratio: 4 / 3; }
-      .who { grid-template-columns: 1fr; }
-      .gallery, .merch { grid-template-columns: 1fr; }
-      .gallery img, .gallery img:nth-child(2), .gallery img:nth-child(3) { aspect-ratio: 4 / 3; }
-      .w3, .w4 { grid-column: span 6; } .w2 { grid-column: span 3; }
+      .thoughts { grid-template-columns: 1fr; }
+      .thoughts img { order: -1; max-width: 320px; }
+      .bar nav { display: none; }
+            .type { grid-template-columns: 1fr; }
+      .ph-grid { grid-template-columns: 1fr 1fr; }
+      .ph:nth-child(n) { grid-column: span 1; }
+      .ph:nth-child(1) { grid-column: span 2; }
+      .ph:nth-child(1) img, .ph:nth-child(2) img { aspect-ratio: 4 / 3; }
     }
     @media (max-width: 640px) {
-      .swatches { grid-template-columns: 1fr; }
-      .sw { min-height: 200px; }
-      .w2 { grid-column: span 6; }
+      .dl-btns .btn { width: 100%; justify-content: center; }
+      .swatches, .tex-grid, .ex-grid, .products { grid-template-columns: 1fr; }
+      .products .bottle { grid-row: auto; aspect-ratio: 4 / 5; }
+      .products .hoodie { aspect-ratio: 4 / 5; }
+      .logo-grid { grid-template-columns: 1fr 1fr; }
+      .logo .art img { inset: 12%; width: 76%; height: 76%; }
+      .logo.app .art img { inset: 16%; width: 68%; height: 68%; }
+      figcaption { flex-direction: column; align-items: flex-start; gap: 8px; padding: 10px 12px; font-size: 13px; }
+      .bar .btn { padding: 9px 14px; font-size: 13px; }
     }
-    @media (prefers-reduced-motion: reduce) {
-      .rise { opacity: 1; transform: none; transition: none; }
-    }
+    @media (prefers-reduced-motion: reduce) { .rise { opacity: 1; transform: none; transition: none; } html { scroll-behavior: auto; } }
   </style>
 </head>
 <body>
 
-  <header class="site-head">
-    <a href="index.html" aria-label="Apex home"><img src="img/logo/lockup.png" alt="Apex"></a>
+  <header class="bar">
+    <a href="index.html" aria-label="Apex home"><img src="assets/logos/white/apex-logotype-and-icon-white.svg" alt="Apex"></a>
+    <nav aria-label="Sections">
+      <a href="#downloads">Downloads</a>
+      <a href="#logos">Logos</a>
+      <a href="#colour">Colour</a>
+      <a href="#type">Typography</a>
+      <a href="#texture">Texture</a>
+      <a href="#photography">Photography</a>
+    </nav>
+    <a class="btn sm" href="https://www.playbook.com/s/studio-luminary/ghf2rv7jqD2U3LdZXkbcLxru" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg> Download all</a>
   </header>
 
-  <section class="shot cover" id="top">
-    <img src="img/summit.jpg" alt="A lone hiker on a snowy summit">
-    <div><h1>From the forest to the summit.</h1></div>
+  <section class="hero">
+    <img class="bg" src="img/summit.jpg" alt="">
+    <h1>Apex<br>brand ID</h1>
   </section>
 
-  <section>
-    <h2 class="rise">The customer is the hero. Apex is the guide.</h2>
-    <p class="sub rise">We lead owners out of the forest of doing it all, up to freedom and peace of mind.</p>
-    <div class="climb">
-      <figure class="rise"><img src="img/forest.jpg" alt=""><figcaption><b>The forest</b><span>Where they are.</span></figcaption></figure>
-      <figure class="rise"><img src="img/hero.jpg" alt=""><figcaption><b>The trail</b><span>Where we guide.</span></figcaption></figure>
-      <figure class="rise"><img src="img/hero-climber.jpg" alt=""><figcaption><b>The summit</b><span>Who they become.</span></figcaption></figure>
+  <section id="downloads">
+    <div class="dl-btns rise">
+      <a class="btn" href="https://www.playbook.com/s/studio-luminary/ghf2rv7jqD2U3LdZXkbcLxru" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg> Download all brand files</a>
+      <a class="btn ghost" href="assets/docs/Apex-Brand-Identity-and-Strategy.pdf" download><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg> Download brand identity &amp; strategy deck</a>
+      <a class="btn ghost" href="assets/docs/Apex-Target-Audience-Research.pdf" download><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg> Download target audience research</a>
     </div>
   </section>
 
-  <section style="padding-top: 0;">
-    <h2 class="rise">They built something real, and got trapped inside it.</h2>
-    <div class="who">
-      <div class="rise"><b>82%</b><p>of <strong>business owners</strong> lose sleep over work.</p></div>
-      <div class="rise"><b>52%</b><p>of <strong>creators</strong> have burned out.</p></div>
+  <section id="thoughts">
+    <div class="thoughts">
+      <div class="words rise">
+        <h2>Ezra’s Thoughts</h2>
+        <p>“Apex is a great product, but humans don’t buy features. They buy what the purchase can help them become.”</p>
+      </div>
+      <img class="rise" src="img/brand/me.jpg" alt="Ezra" loading="lazy">
     </div>
   </section>
 
-  <section class="shot bottom">
-    <img src="img/ridges.jpg" alt="">
-    <div>
-      <h2 class="rise">Freedom is a climb.</h2>
-      <p class="sub rise" style="color: var(--paper);">That’s why the whole brand lives in the mountains.</p>
+  <section id="logos">
+    <div class="head rise"><h2>Logos.</h2></div>
+    <div class="group">
+      <h3 class="rise">Green logos · for light backgrounds</h3>
+      <div class="logo-grid">
+<figure class="logo on-paper  rise"><div class="art"><img src="assets/logos/green/apex-logotype-with-icon-green.svg" alt="Apex Logo + icon" loading="lazy"></div><figcaption><span>Logo + icon</span><a href="assets/logos/green/apex-logotype-with-icon-green.svg" download><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg> SVG</a></figcaption></figure>
+<figure class="logo on-paper  rise"><div class="art"><img src="assets/logos/green/apex-logotype-with-icon-stack-green.svg" alt="Apex Stacked logo" loading="lazy"></div><figcaption><span>Stacked logo</span><a href="assets/logos/green/apex-logotype-with-icon-stack-green.svg" download><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg> SVG</a></figcaption></figure>
+<figure class="logo on-paper  rise"><div class="art"><img src="assets/logos/green/apex-logotype-green.svg" alt="Apex Logotype" loading="lazy"></div><figcaption><span>Logotype</span><a href="assets/logos/green/apex-logotype-green.svg" download><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg> SVG</a></figcaption></figure>
+<figure class="logo on-paper  rise"><div class="art"><img src="assets/logos/green/apex-logotype-host-green.svg" alt="Apex Logotype .host" loading="lazy"></div><figcaption><span>Logotype .host</span><a href="assets/logos/green/apex-logotype-host-green.svg" download><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg> SVG</a></figcaption></figure>
+<figure class="logo on-paper  rise"><div class="art"><img src="assets/logos/green/apex-logotype-host-with-icon-green.svg" alt="Apex Logotype .host + icon" loading="lazy"></div><figcaption><span>Logotype .host + icon</span><a href="assets/logos/green/apex-logotype-host-with-icon-green.svg" download><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg> SVG</a></figcaption></figure>
+<figure class="logo on-paper  rise"><div class="art"><img src="assets/logos/green/apex-icon-green.svg" alt="Apex Icon" loading="lazy"></div><figcaption><span>Icon</span><a href="assets/logos/green/apex-icon-green.svg" download><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg> SVG</a></figcaption></figure>
+<figure class="logo on-paper  rise"><div class="art"><img src="assets/logos/green/apex-icon-with-logotype-host-overlay-green.svg" alt="Apex Icon with .host overlay" loading="lazy"></div><figcaption><span>Icon with .host overlay</span><a href="assets/logos/green/apex-icon-with-logotype-host-overlay-green.svg" download><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg> SVG</a></figcaption></figure>
+<figure class="logo on-paper app rise"><div class="art"><img src="assets/logos/green/apex-app-green-with-white-icon.svg" alt="Apex App icon" loading="lazy"></div><figcaption><span>App icon</span><a href="assets/logos/green/apex-app-green-with-white-icon.svg" download><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg> SVG</a></figcaption></figure>
+<figure class="logo on-paper app rise"><div class="art"><img src="assets/logos/green/apex-app-green-with-white-logotype.svg" alt="Apex App logotype" loading="lazy"></div><figcaption><span>App logotype</span><a href="assets/logos/green/apex-app-green-with-white-logotype.svg" download><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg> SVG</a></figcaption></figure>
+<figure class="logo on-paper app rise"><div class="art"><img src="assets/logos/green/apex-app-green-with-white-logotype-host.svg" alt="Apex App logotype .host" loading="lazy"></div><figcaption><span>App logotype .host</span><a href="assets/logos/green/apex-app-green-with-white-logotype-host.svg" download><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg> SVG</a></figcaption></figure>
+      </div>
+    </div>
+    <div class="group">
+      <h3 class="rise">White logos · for dark backgrounds</h3>
+      <div class="logo-grid">
+<figure class="logo on-pine  rise"><div class="art"><img src="assets/logos/white/apex-logotype-and-icon-white.svg" alt="Apex Logo + icon" loading="lazy"></div><figcaption><span>Logo + icon</span><a href="assets/logos/white/apex-logotype-and-icon-white.svg" download><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg> SVG</a></figcaption></figure>
+<figure class="logo on-pine  rise"><div class="art"><img src="assets/logos/white/apex-logotype-and-icon-white-stack.svg" alt="Apex Stacked logo" loading="lazy"></div><figcaption><span>Stacked logo</span><a href="assets/logos/white/apex-logotype-and-icon-white-stack.svg" download><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg> SVG</a></figcaption></figure>
+<figure class="logo on-pine  rise"><div class="art"><img src="assets/logos/white/apex-logotype.svg" alt="Apex Logotype" loading="lazy"></div><figcaption><span>Logotype</span><a href="assets/logos/white/apex-logotype.svg" download><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg> SVG</a></figcaption></figure>
+<figure class="logo on-pine  rise"><div class="art"><img src="assets/logos/white/apex-logotype-host-white.svg" alt="Apex Logotype .host" loading="lazy"></div><figcaption><span>Logotype .host</span><a href="assets/logos/white/apex-logotype-host-white.svg" download><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg> SVG</a></figcaption></figure>
+<figure class="logo on-pine  rise"><div class="art"><img src="assets/logos/white/apex-logotype-host-and-icon-white.svg" alt="Apex Logotype .host + icon" loading="lazy"></div><figcaption><span>Logotype .host + icon</span><a href="assets/logos/white/apex-logotype-host-and-icon-white.svg" download><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg> SVG</a></figcaption></figure>
+<figure class="logo on-pine  rise"><div class="art"><img src="assets/logos/white/apex-icon-white.svg" alt="Apex Icon" loading="lazy"></div><figcaption><span>Icon</span><a href="assets/logos/white/apex-icon-white.svg" download><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg> SVG</a></figcaption></figure>
+<figure class="logo on-pine  rise"><div class="art"><img src="assets/logos/white/apex-icon-with-logotype-host-overlay-white.svg" alt="Apex Icon with .host overlay" loading="lazy"></div><figcaption><span>Icon with .host overlay</span><a href="assets/logos/white/apex-icon-with-logotype-host-overlay-white.svg" download><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg> SVG</a></figcaption></figure>
+<figure class="logo on-pine app rise"><div class="art"><img src="assets/logos/white/apex-app-white-with-green-icon.svg" alt="Apex App icon" loading="lazy"></div><figcaption><span>App icon</span><a href="assets/logos/white/apex-app-white-with-green-icon.svg" download><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg> SVG</a></figcaption></figure>
+<figure class="logo on-pine app rise"><div class="art"><img src="assets/logos/white/apex-app-white-with-green-logotype.svg" alt="Apex App logotype" loading="lazy"></div><figcaption><span>App logotype</span><a href="assets/logos/white/apex-app-white-with-green-logotype.svg" download><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg> SVG</a></figcaption></figure>
+<figure class="logo on-pine app rise"><div class="art"><img src="assets/logos/white/apex-app-white-with-green-logotype-host.svg" alt="Apex App logotype .host" loading="lazy"></div><figcaption><span>App logotype .host</span><a href="assets/logos/white/apex-app-white-with-green-logotype-host.svg" download><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg> SVG</a></figcaption></figure>
+      </div>
     </div>
   </section>
 
-  <section class="mark center">
-    <img class="icon rise" src="img/brand/icon-green.png" alt="The Apex icon">
-    <h2 class="rise">A hiker, a flag, the top.</h2>
-    <p class="sub rise">The mountain is conquered. Freedom is claimed. The guide isn’t in the picture.</p>
-  </section>
-
-  <section>
-    <h2 class="rise">The logo.</h2>
-    <div class="logos">
-      <div class="tile photo w6 rise"><img src="img/forest.jpg" alt=""><img src="img/logo/lockup.png" alt="Apex lockup"></div>
-      <div class="tile t-paper w3 rise"><img src="img/brand/stack-green.png" alt="Apex stacked, green"></div>
-      <div class="tile photo w3 rise"><img src="img/summit.jpg" alt=""><img src="img/logo/stack.png" alt="Apex stacked, beige"></div>
-      <div class="tile photo w2 rise"><img src="img/hero.jpg" alt=""><img src="img/logo/icon.png" alt="Apex icon"></div>
-      <div class="tile photo w2 rise"><img src="img/hero-climber.jpg" alt=""><img src="img/logo/app-icon.png" alt="Apex app icon"></div>
-      <div class="tile t-paper w2 rise"><img src="img/brand/icon-green.png" alt="Apex icon, green"></div>
-      <div class="tile photo w4 rise"><img src="img/ridges.jpg" alt=""><img src="img/logo/lockup-host.png" alt="Apex.host lockup"></div>
-      <div class="tile t-paper w2 rise"><img src="img/brand/wordmark-host-green.png" alt="Apex.host wordmark"></div>
-    </div>
-  </section>
-
-  <section style="padding-top: 0;">
-    <h2 class="rise">Two colours. Never black. Never white.</h2>
-    <p class="sub rise">Green is calm, stable and trusted. Paper is how we speak.</p>
+  <section id="colour">
+    <div class="head rise"><h2>Only 2 brand colours</h2></div>
     <div class="swatches">
-      <div class="sw green rise"><b>Forest</b><span>#1C3A28</span></div>
-      <div class="sw paper rise"><b>Paper</b><span>#ECECE4</span></div>
+      <button class="sw pine rise" data-hex="#1C3A28" type="button"><em>Copy hex</em><div><b>Pine Green</b><span>#1C3A28 · RGB 28 58 40</span></div></button>
+      <button class="sw mist rise" data-hex="#ECECE4" type="button"><em>Copy hex</em><div><b>Misty White</b><span>#ECECE4 · RGB 236 236 228</span></div></button>
     </div>
   </section>
 
-  <section class="after-colour">
-    <h2 class="rise">Black and white. Contrast and character.</h2>
-    <div class="gallery">
-      <img class="rise" src="img/forest.jpg" alt="A forest in mist">
-      <img class="rise" src="img/hero.jpg" alt="A rope team on a ridge">
-      <img class="rise" src="img/hero-climber.jpg" alt="A climber on a snow slope">
-      <img class="rise" src="img/summit.jpg" alt="A hiker on a summit">
+  <section id="type">
+    <div class="type-card rise">
+    <div class="head"><h2>Typography</h2></div>
+    <div class="type">
+      <div class="rise">
+        <div class="aa">Aa</div>
+        <p class="fname">Inter</p>
+        <p class="lede" style="margin-top:8px">The only typeface. Tight and bold for headlines, regular for everything else.</p>
+        <a class="btn ghost sm" style="margin-top:24px" href="https://fonts.google.com/specimen/Inter" target="_blank" rel="noopener">Get Inter (free)</a>
+      </div>
+      <div class="rise">
+        <div class="weights">
+          <div style="font-weight:800">Extra Bold <small>800 · Headlines</small></div>
+          <div style="font-weight:700">Bold <small>700 · Subheads, buttons</small></div>
+          <div style="font-weight:500">Medium <small>500 · Labels</small></div>
+          <div style="font-weight:400">Regular <small>400 · Body copy</small></div>
+        </div>
+        <div class="hier">
+          <h4>Headline</h4>
+          <h5>Subhead</h5>
+          <p>Body copy. Talk like a guide who has done this climb before: calm, direct, a little rugged.</p>
+        </div>
+      </div>
+    </div>
+    <div class="alpha" aria-label="Alphabet specimen">ABCDEFGHIJKLMNOPQRSTUVWXYZ<br>abcdefghijklmnopqrstuvwxyz<br>0123456789 &amp;!?.,:;@#%</div>
     </div>
   </section>
 
-  <section style="padding-top: 0;">
-    <h2 class="rise">Wear the climb.</h2>
-    <div class="merch">
-      <img class="rise" src="img/brand/tee-front.jpg" alt="Apex t-shirt, front: small icon on the chest">
-      <img class="rise" src="img/brand/tee-back.jpg" alt="Apex t-shirt, back: topographic lines with the Apex.host lockup">
+  <section id="texture">
+    <div class="head rise"><h2>Texture.</h2><p class="lede">Topographic map lines add depth to flat colour. Use them quietly behind type, on merch and on documents.</p></div>
+    <div class="tex-grid">
+      <figure class="tex pine rise"><img src="assets/textures/apex-topo-texture-green.svg" alt="Topographic texture on Pine Green" loading="lazy"><figcaption><span>Topo texture · Pine Green</span><a href="assets/textures/apex-topo-texture-green.svg" download><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg> SVG</a></figcaption></figure>
+      <figure class="tex mist rise"><img src="assets/textures/apex-topo-texture-misty-white.svg" alt="Topographic texture on Misty White" loading="lazy"><figcaption><span>Topo texture · Misty White</span><a href="assets/textures/apex-topo-texture-misty-white.svg" download><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg> SVG</a></figcaption></figure>
     </div>
   </section>
 
-  <section class="center" style="padding-top: 0;">
-    <h2 class="rise">Calm. Direct. A little rugged.</h2>
-    <p class="sub rise">Talk like a guide who’s done this climb before.</p>
+  <section id="photography">
+    <div class="head rise"><h2>Photography.</h2><p class="lede">Raw and dramatic mountain and forest scapes in B&amp;W or green / white tinted.</p></div>
+    <div class="ph-grid">
+<figure class="ph rise"><img src="img/forest.jpg" alt="Forest" loading="lazy"><figcaption><span>Forest</span><a href="img/forest.jpg" download><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg> JPG</a></figcaption></figure>
+<figure class="ph rise"><img src="img/hero.jpg" alt="The trail" loading="lazy"><figcaption><span>The trail</span><a href="img/hero.jpg" download><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg> JPG</a></figcaption></figure>
+<figure class="ph rise"><img src="img/hero-climber.jpg" alt="The climb" loading="lazy"><figcaption><span>The climb</span><a href="img/hero-climber.jpg" download><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg> JPG</a></figcaption></figure>
+<figure class="ph rise"><img src="img/ridges.jpg" alt="Ridges" loading="lazy"><figcaption><span>Ridges</span><a href="img/ridges.jpg" download><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg> JPG</a></figcaption></figure>
+<figure class="ph rise"><img src="img/summit.jpg" alt="The summit" loading="lazy"><figcaption><span>The summit</span><a href="img/summit.jpg" download><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg> JPG</a></figcaption></figure>
+    </div>
   </section>
 
-  <section class="shot close">
-    <img src="img/summit.jpg" alt="">
+  <section id="use">
+    <div class="head rise"><h2>Logo in action</h2></div>
+    <div class="ex-grid">
+<a class="ex rise" href="img/brand/examples/1.jpg" target="_blank" rel="noopener"><img src="img/brand/examples/1.jpg" alt="Apex logo in use, example 1" loading="lazy"></a>
+<a class="ex rise" href="img/brand/examples/2.jpg" target="_blank" rel="noopener"><img src="img/brand/examples/2.jpg" alt="Apex logo in use, example 2" loading="lazy"></a>
+<a class="ex rise" href="img/brand/examples/3.jpg" target="_blank" rel="noopener"><img src="img/brand/examples/3.jpg" alt="Apex logo in use, example 3" loading="lazy"></a>
+<a class="ex rise" href="img/brand/examples/4.jpg" target="_blank" rel="noopener"><img src="img/brand/examples/4.jpg" alt="Apex logo in use, example 4" loading="lazy"></a>
+<a class="ex rise" href="img/brand/examples/5.jpg" target="_blank" rel="noopener"><img src="img/brand/examples/5.jpg" alt="Apex logo in use, example 5" loading="lazy"></a>
+<a class="ex rise" href="img/brand/examples/6.jpg" target="_blank" rel="noopener"><img src="img/brand/examples/6.jpg" alt="Apex logo in use, example 6" loading="lazy"></a>
+    </div>
+  </section>
+
+  <section id="products">
+    <div class="head rise"><h2>Branded products</h2></div>
+    <div class="products">
+      <img class="rise hoodie" src="img/brand/hoodie.jpg" alt="Apex hoodie, Pine Green with the Apex wordmark on the chest, worn on a mountain summit" loading="lazy">
+      <img class="rise bottle" src="img/brand/bottle.jpg" alt="Apex water bottle with topographic lines, on a mountain summit" loading="lazy">
+      <img class="rise" src="img/brand/tee-front.jpg" alt="Apex t-shirt, front: small icon on the chest" loading="lazy">
+      <img class="rise" src="img/brand/tee-back.jpg" alt="Apex t-shirt, back: topographic lines with the Apex.host lockup" loading="lazy">
+    </div>
+  </section>
+
+  <section id="homepage">
+    <div class="head rise"><h2>View the customer landing page</h2></div>
     <div class="rise">
-      <img class="stack" src="img/logo/stack.png" alt="Apex">
-      <h2>Every summit has a guide.</h2>
+      <a class="btn" href="index.html">Open page</a>
     </div>
   </section>
 
-  <footer>© 2026 Apex.host</footer>
+  <section id="invoice">
+    <div class="head rise"><h2>Invoice</h2></div>
+    <div class="rise">
+      <a class="btn" href="invoice/">View invoice</a>
+    </div>
+  </section>
 
-  <script src="https://cdn.jsdelivr.net/npm/lenis@1.3.26/dist/lenis.min.js"></script>
+  <section id="claude">
+    <div class="head rise"><h2>Design with Claude</h2></div>
+    <div class="rise">
+      <div class="claude-btns">
+        <a class="btn" href="assets/apex-brand-skill.zip" download><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg> Download the Claude skill</a>
+        <a class="btn ghost" href="https://claude.ai/artifact/D5DcpRYwoqvQGGRoEkxVFx" target="_blank" rel="noopener">Open the Apex design system →</a>
+      </div>
+      <p class="claude-note">Add the zip in Claude’s settings under Skills. Anything you make for Apex will follow the brand.</p>
+    </div>
+  </section>
+
+  <footer><span>© 2026 Apex.host</span><a href="https://www.playbook.com/s/studio-luminary/ghf2rv7jqD2U3LdZXkbcLxru" target="_blank" rel="noopener">Download all brand files</a></footer>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
   <script>
     (function () {
-      var reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
-      if (!reduce && window.Lenis) window.lenis = new Lenis({ autoRaf: true, lerp: 0.075, wheelMultiplier: 0.9, anchors: true });
-
       var io = new IntersectionObserver(function (es) {
         es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } });
-      }, { threshold: 0.12, rootMargin: "0px 0px -6% 0px" });
+      }, { threshold: 0.08, rootMargin: "0px 0px -4% 0px" });
       document.querySelectorAll(".rise").forEach(function (el) { io.observe(el); });
 
-      var head = document.querySelector(".site-head"), lastY = scrollY, tick = false;
-      addEventListener("scroll", function () {
-        if (tick) return;
-        tick = true;
-        requestAnimationFrame(function () {
-          tick = false;
-          var y = scrollY;
-          if (y < 80) head.classList.remove("away", "solid");
-          else if (y > lastY + 4) head.classList.add("away");
-          else if (y < lastY - 4) { head.classList.remove("away"); head.classList.add("solid"); }
-          lastY = y;
+      var toast = document.getElementById("toast"), t;
+      document.querySelectorAll(".sw").forEach(function (b) {
+        b.addEventListener("click", function () {
+          var hex = b.getAttribute("data-hex");
+          if (navigator.clipboard) navigator.clipboard.writeText(hex).catch(function () {});
+          toast.textContent = "Copied " + hex; toast.classList.add("show");
+          clearTimeout(t); t = setTimeout(function () { toast.classList.remove("show"); }, 1600);
         });
-      }, { passive: true });
+      });
     })();
   </script>
 </body>

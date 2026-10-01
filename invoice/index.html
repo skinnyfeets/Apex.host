@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Invoice C9WPK9JJ · Apex.host</title>
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="../img/logo/app-icon.png" type="image/png">
+  <link rel="icon" href="../img/logo/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root { --pine: #1c3a28; --mist: #ecece4; --soft: rgba(236,236,228,.72); --line: rgba(28,58,40,.18); --pad: clamp(16px, 5vw, 80px); }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: var(--pine); color: var(--mist); font-family: "Inter", system-ui, sans-serif; -webkit-font-smoothing: antialiased; font-size: 16px; line-height: 1.5; }
+    a { color: inherit; }
+
+    .bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px var(--pad); }
+    .bar img { height: 26px; width: auto; display: block; }
+    .btn { display: inline-flex; align-items: center; gap: 10px; background: var(--mist); color: var(--pine); font: inherit; font-weight: 700; font-size: 15px; text-decoration: none; padding: 12px 22px; border-radius: 999px; border: 0; cursor: pointer; transition: transform .2s; white-space: nowrap; }
+    .btn:hover { transform: translateY(-2px); }
+    .btn.ghost { background: transparent; color: var(--mist); border: 1.5px solid rgba(236,236,228,.3); }
+    .btn.pine { background: var(--pine); color: var(--mist); }
+
+    main { padding: clamp(8px, 2vw, 24px) var(--pad) clamp(48px, 8vw, 120px); }
+    .sheet { background: var(--mist); color: var(--pine); border-radius: 24px; max-width: 980px; margin: 0 auto; padding: clamp(24px, 5vw, 64px); }
+
+    .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; flex-wrap: wrap; }
+    h1 { font-size: clamp(40px, 6vw, 72px); font-weight: 800; letter-spacing: -0.035em; line-height: .95; text-transform: uppercase; }
+
+    dl.meta { display: grid; grid-template-columns: auto 1fr; gap: 6px 28px; margin-top: 32px; }
+    dl.meta dt { font-weight: 700; }
+    dl.meta dd { font-variant-numeric: tabular-nums; }
+
+    .parties { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: clamp(32px, 5vw, 56px); }
+    .parties h2 { font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; opacity: .65; margin-bottom: 8px; }
+    .parties p { line-height: 1.5; }
+    .parties b { font-weight: 800; }
+
+    .due { margin-top: clamp(32px, 5vw, 56px); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px; }
+    .due p { font-size: clamp(24px, 3.4vw, 40px); font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; }
+
+    .etransfer { margin-top: 16px; font-size: 15px; opacity: .8; }
+    .etransfer b { font-weight: 700; opacity: 1; }
+
+    table { width: 100%; border-collapse: collapse; margin-top: clamp(32px, 5vw, 56px); font-variant-numeric: tabular-nums; }
+    th { text-align: right; font-size: 13px; font-weight: 500; padding: 0 0 10px; opacity: .65; }
+    td { text-align: right; padding: 14px 0; vertical-align: top; }
+    th:first-child, td:first-child { text-align: left; padding-right: 16px; }
+    td:first-child { font-weight: 500; }
+    th:nth-child(2), td:nth-child(2) { width: 12%; }
+    th:nth-child(3), td:nth-child(3), th:nth-child(4), td:nth-child(4) { width: 18%; }
+
+    .totals { margin: 28px 0 0 auto; width: min(100%, 380px); font-variant-numeric: tabular-nums; }
+    .totals div { display: flex; justify-content: space-between; gap: 16px; padding: 8px 0; }
+    .totals .owed { font-weight: 800; font-size: 20px; margin-top: 8px; }
+
+    .foot { margin-top: clamp(40px, 6vw, 72px); font-size: 13px; opacity: .7; }
+
+    .terms { background: var(--mist); color: var(--pine); border-radius: 24px; max-width: 980px; margin: clamp(16px, 2.5vw, 28px) auto 0; padding: clamp(24px, 4vw, 48px); }
+    .terms h2 { font-size: clamp(28px, 3.6vw, 48px); font-weight: 800; letter-spacing: -0.035em; line-height: 1; text-transform: uppercase; }
+    .terms .lede { color: var(--soft); margin-top: 14px; }
+    .terms ul { list-style: none; margin: 20px 0 24px; }
+    .terms li { padding: 8px 0; color: rgba(28,58,40,.75); }
+    .terms li b { color: var(--pine); font-weight: 700; }
+    .terms .btn { background: var(--pine); color: var(--mist); }
+
+    @media (max-width: 640px) {
+      .parties { grid-template-columns: 1fr; }
+      td, th { font-size: 14px; }
+      th:nth-child(3), th:nth-child(4), td:nth-child(3), td:nth-child(4) { width: 22%; }
+    }
+    @media print {
+      body { background: #fff; }
+      .bar, .noprint { display: none !important; }
+      main { padding: 0; }
+      .sheet { border-radius: 0; max-width: none; padding: 0; background: #fff; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="bar">
+    <a href="../index.html" aria-label="Apex home"><img src="../assets/logos/white/apex-logotype-and-icon-white.svg" alt="Apex"></a>
+    <button class="btn ghost" type="button" onclick="window.print()">Print or save as PDF</button>
+  </header>
+
+  <main>
+    <article class="sheet">
+      <div class="top">
+        <h1>Invoice</h1>
+      </div>
+
+      <dl class="meta">
+        <dt>Invoice number</dt><dd>C9WPK9JJ</dd>
+        <dt>Date of issue</dt><dd>September 30, 2026</dd>
+        <dt>Date due</dt><dd>October 30, 2026</dd>
+      </dl>
+
+      <div class="parties">
+        <div>
+          <h2>From</h2>
+          <p><b>LUMINARY G</b><br>+1 236-457-5303<br>ezra@luminarygraphix.com</p>
+        </div>
+        <div>
+          <h2>Bill to</h2>
+          <p>Apex.host</p>
+        </div>
+      </div>
+
+      <div class="due">
+        <p>$10,000.00 USD due October 30, 2026</p>
+        <a class="btn pine noprint" href="https://invoice.stripe.com/i/acct_1ODeQFAcY2Rwvtoo/live_YWNjdF8xT0RlUUZBY1kyUnd2dG9vLF9WTUVhaE4xZUg5QjZQRXg3WnNheFdLWGFQbm9ld3FsLDE4MTM0OTg1OA0200r1OkRhcl?s=db" target="_blank" rel="noopener">Pay online</a>
+      </div>
+      <p class="etransfer">Prefer to pay by Interac e-Transfer? Send it to <b>ezzy1dombowsky@gmail.com</b></p>
+
+      <table>
+        <thead>
+          <tr><th scope="col">Description</th><th scope="col">Qty</th><th scope="col">Unit price</th><th scope="col">Amount</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Audience &amp; Positioning Research</td><td>1</td><td>$500.00</td><td>$500.00</td></tr>
+          <tr><td>Brand Strategy</td><td>1</td><td>$2,500.00</td><td>$2,500.00</td></tr>
+          <tr><td>Logo &amp; Visual Identity</td><td>1</td><td>$6,000.00</td><td>$6,000.00</td></tr>
+          <tr><td>Customer Landing page</td><td>1</td><td>$500.00</td><td>$500.00</td></tr>
+          <tr><td>Digital Brand Guidelines</td><td>1</td><td>$500.00</td><td>$500.00</td></tr>
+          <tr><td>Claude Design Skill</td><td>1</td><td>$0.00</td><td>$0.00</td></tr>
+          <tr><td>Custom Merch Drop-off Within 10 days of payment</td><td>1</td><td>$0.00</td><td>$0.00</td></tr>
+        </tbody>
+      </table>
+
+      <div class="totals">
+        <div><span>Subtotal</span><span>$10,000.00</span></div>
+        <div><span>Total</span><span>$10,000.00</span></div>
+        <div class="owed"><span>Amount due</span><span>$10,000.00 USD</span></div>
+      </div>
+
+      <p class="foot">C9WPK9JJ · $10,000.00 USD due October 30, 2026</p>
+    </article>
+
+    <section class="terms noprint">
+      <h2>Brand rights &amp; implementation</h2>
+      <ul>
+        <li><b>Royalty-free rights.</b> Apex.host receives royalty-free rights to the branding.</li>
+        <li><b>Implementation help.</b> Ezra helps implement the brand into your business for 2 business days within 30 days of signing the contract.</li>
+      </ul>
+      <a class="btn" href="../assets/docs/Apex-Brand-Rights-Agreement.pdf" download><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg> Download the agreement (PDF)</a>
+    </section>
+  </main>
+
+</body>
+</html>
