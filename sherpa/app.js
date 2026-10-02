@@ -34,9 +34,17 @@
     expand: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
     shrink: '<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>',
     close: '<path d="M6 6l12 12M18 6L6 18"/>',
+    chev: '<path d="M6 9l6 6 6-6"/>',
     check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
     plus: '<path d="M5 12h14M12 5v14"/>',
-    minus: '<path d="M5 12h14"/>'
+    minus: '<path d="M5 12h14"/>',
+    target: '<circle cx="12" cy="12" r="7"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>',
+    docs: '<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/>',
+    marketing: '<path d="M3 10v4h3l7 4V6l-7 4z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/>',
+    social: '<path d="M12 20s-7-4.3-7-9.5A4 4 0 0 1 12 8a4 4 0 0 1 7 2.5C19 15.7 12 20 12 20z"/>',
+    team: '<rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="12" cy="10" r="3"/><path d="M8 17c.6-2 2.2-3 4-3s3.4 1 4 3"/>',
+    store: '<path d="M5 8h14l-1 12H6z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
+    camera: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>'
   };
   function icon(name, size, color, sw) {
     return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="' + (color || 'currentColor') + '" stroke-width="' + (sw || 2) + '" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICON[name] + '</svg>';
@@ -44,40 +52,63 @@
   var PEAK = '<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 20 L9.5 7 L13.5 13.5 L16 10 L22 20 Z" fill="currentColor"/></svg>';
 
   /* ================= state ================= */
-  var KEY = 'apex-sherpa-app-v1';
+  var KEY = 'apex-sherpa-app-v3';
   function fresh() {
-    return { name: 'Hunter', onboarded: false, step: 'name', summit: 20, why: 'Family', camps: {}, model: 'Claude', approvals: {}, trails: {}, perms: {}, added: [], undone: {}, reached: 0, summits: 0, lens: 'map', protect: 'Friday afternoons' };
+    return { name: 'Hunter', photo: '', onboarded: false, step: 'welcome', summit: 20, why: 'Family', camps: {}, models: ['Claude'], approvals: {}, rejected: {}, trails: {}, perms: {}, undone: {}, reached: 0, summits: 0, lens: 'map', baseAt: 0, done: [], nextAt: 0, cursor: 0, mapN: 1 };
   }
   var state = load();
   function load() {
     var s = fresh();
     try { var raw = localStorage.getItem(KEY); if (raw) { var o = JSON.parse(raw); for (var k in o) if (o.hasOwnProperty(k)) s[k] = o[k]; } } catch (e) { }
+    for (var id in s.camps) { var cm = s.camps[id]; if (cm && !cm.tools) cm.tools = cm.tool ? [cm.tool] : []; }
+    if (!s.models || !s.models.length) s.models = [s.model || 'Claude'];
     return s;
   }
   function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { } }
 
-  var session = { snoozed: {}, pendingTool: {}, connecting: null, campLens: {}, openRow: null, logCamp: 'all', logQuery: '', logSel: null, chat: [], full: false, nameError: false, confirmReset: false, last: null };
+  var session = { snoozed: {}, pendingTool: {}, connecting: null, openRow: null, logCamp: 'all', logQuery: '', logSel: null, chat: [], full: false, nameError: false, confirmReset: false, last: null, mapVB: {}, cam: {}, busy: 0, noClick: 0, dirty: false, apprOpen: {} };
 
   /* ================= derived data ================= */
   function camp(id) { for (var i = 0; i < D.CAMPS.length; i++) if (D.CAMPS[i].id === id) return D.CAMPS[i]; return null; }
   function isOn(id) { return !!state.camps[id]; }
-  function toolOf(id) { return (state.camps[id] || {}).tool || camp(id).tools[0]; }
+  // Every camp can hold several connectors (Gmail and Outlook, Slack and Teams), and Base Camp several AIs.
+  function toolsOf(id) { var cm = state.camps[id]; return cm && cm.tools ? cm.tools : []; }
+  function toolOf(id) { return toolsOf(id)[0] || camp(id).tools[0]; }
+  function toolsLabel(id) { return toolsOf(id).join(' + ') || camp(id).tools[0]; }
+  function modelsLabel() { return state.models.join(' + '); }
   function sourceOf(entry) {
-    if (entry.camp === 'mail') { var t = toolOf('mail'); return t === 'Outlook' ? 'Outlook' : entry.src === 'cal' ? 'Google Calendar' : 'Gmail'; }
+    if (entry.camp === 'mail') { var g = toolsOf('mail').indexOf('Gmail') > -1 || !toolsOf('mail').length; return entry.src === 'cal' ? (g ? 'Google Calendar' : 'Outlook') : (g ? 'Gmail' : toolOf('mail')); }
     return toolOf(entry.camp);
   }
   function trailHours(campId) {
     var h = 0; D.TRAILS.forEach(function (t) { if (t.camp === campId && state.trails[t.id] === 'taken') h += t.hours; }); return h;
   }
-  function campHours(id) { return isOn(id) ? camp(id).hours + trailHours(id) : 0; }
-  function elevation() { var e = 0; D.CAMPS.forEach(function (c) { e += campHours(c.id); }); return r1(e); }
+  /* Time saved. Nothing counts until Base Camp. After that only finished tasks count, each one the time it
+     would otherwise have taken you. Elevation is the time saved in the last seven days. */
+  var DAY = 864e5, WEEK = 7 * DAY;
+  function startOfDay(t) { var d = new Date(t || Date.now()); return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(); }
+  function liveDone() { return (state.done || []).filter(function (d) { return !state.undone[d.id]; }); }
+  function weekDone(campId) { var since = Date.now() - WEEK; return liveDone().filter(function (d) { return d.ts >= since && (!campId || d.camp === campId); }); }
+  function savedMin(campId) { return weekDone(campId).reduce(function (a, d) { return a + d.min; }, 0); }
+  function campHours(id) { return r1(savedMin(id) / 60); }
+  function elevation() { return r1(savedMin() / 60); }
+  // What the connected camps and handed-over trails can save at full pace: the most Sherpa can climb to.
+  function potential() { var p = 0; D.CAMPS.forEach(function (c) { if (isOn(c.id)) p += c.hours + trailHours(c.id); }); return p; }
   function toGo() { return r1(Math.max(0, state.summit - elevation())); }
-  function weeks() { var e = elevation(); return [0.18, 0.41, 0.59, 0.73, 1].map(function (f) { return r1(e * f); }); }
-  function delta() { var h = weeks(); return r1(h[4] - h[3]); }
-  function level(c) { return Math.floor(c.memories / 500) + 1; }
-  function toNext(c) { return level(c) * 500 - c.memories; }
-  function openApprovals() { return D.APPROVALS.filter(function (a) { return isOn(a.camp) && !state.approvals[a.id]; }); }
+  function todayMinutes() { var a = startOfDay(); return liveDone().filter(function (d) { return d.ts >= a; }).reduce(function (s, d) { return s + d.min; }, 0); }
+  function climbPts() {
+    var acc = 0, pts = [0];
+    weekDone().sort(function (a, b) { return a.ts - b.ts; }).forEach(function (d) { acc += d.min / 60; pts.push(acc); });
+    if (pts.length > 30) { var step = (pts.length - 1) / 29, out = []; for (var i = 0; i < 30; i++) out.push(pts[Math.round(i * step)]); pts = out; }
+    return pts;
+  }
+  // Past Base Camp: the AI is picked and time saved counts. Before it, you're making camp on the way up.
+  function climbing() { return !!state.baseAt; }
+  function coreMade() { return D.CAMPS.filter(function (c) { return c.core && isOn(c.id); }).length; }
+  function openApprovals() { return climbing() ? D.APPROVALS.filter(function (a) { return isOn(a.camp) && !state.approvals[a.id] && !state.rejected[a.id]; }) : []; }
+  function apprOf(id) { return D.APPROVALS.filter(function (a) { return a.id === id; })[0]; }
   function nextTrail(campId) {
+    if (!climbing()) return null;
     for (var i = 0; i < D.TRAILS.length; i++) {
       var t = D.TRAILS[i];
       if ((!campId || t.camp === campId) && isOn(t.camp) && !state.trails[t.id] && !session.snoozed[t.id]) return t;
@@ -85,20 +116,50 @@
     return null;
   }
   function unexplored() { return D.CAMPS.filter(function (c) { return !isOn(c.id); }); }
+  var WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  function dayOf(ts) { var a = startOfDay(); return ts >= a ? 'Today' : ts >= a - DAY ? 'Yesterday' : WEEKDAYS[new Date(ts).getDay()]; }
+  function timeOf(ts) { var d = new Date(ts); return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); }
   function entries() {
-    var list = state.added.slice().reverse().map(function (e) { return e; });
-    D.LOG.forEach(function (e) { if (isOn(e.camp)) list.push(e); });
-    return list.map(function (e) { var o = {}; for (var k in e) o[k] = e[k]; o.source = sourceOf(e); o.undone = !!state.undone[e.id]; return o; });
+    return (state.done || []).slice().sort(function (a, b) { return b.ts - a.ts; }).map(function (e) {
+      var o = {}; for (var k in e) o[k] = e[k];
+      o.day = dayOf(e.ts); o.time = timeOf(e.ts); o.source = sourceOf(e); o.undone = !!state.undone[e.id]; return o;
+    });
   }
-  function todayMinutes() { return entries().filter(function (e) { return e.day === 'Today' && !e.undone; }).reduce(function (a, e) { return a + e.min; }, 0); }
   function initial() { return (state.name || '?').trim().charAt(0).toUpperCase() || '?'; }
 
+  /* Sherpa at work. After Base Camp it finishes a task every few seconds (a demo pace) from the work in your
+     connected camps and the trails you've handed over, until it saves all the time those camps can save.
+     Then it holds that pace until you make a new camp or hand over a trail. */
+  var PACE = 12000;
+  function workQueue() {
+    var list = D.TASKS.filter(function (t) { return isOn(t.camp); });
+    D.TRAILS.forEach(function (t) { if (state.trails[t.id] === 'taken') list.push({ text: t.done, camp: t.camp, min: Math.round(t.hours * 60 / 4), src: 'tool' }); });
+    return list;
+  }
+  function work(now) {
+    if (!state.onboarded || !state.baseAt) return 0;
+    if (!state.nextAt) state.nextAt = state.baseAt + 4000;
+    if (now - state.nextAt > PACE * 3) state.nextAt = now - PACE * 2; // away a while: catch up a little, never a flood
+    var n = 0;
+    while (now >= state.nextAt && n < 3) {
+      var list = workQueue(), room = Math.floor(potential() * 60 - savedMin());
+      if (!list.length || room < 1) { state.nextAt = now + PACE; break; }
+      var t = list[state.cursor % list.length];
+      state.cursor++;
+      state.done.push({ id: 'd' + state.nextAt + '-' + state.cursor, ts: state.nextAt, text: t.text, camp: t.camp, min: Math.min(t.min, room), src: t.src || 'tool' });
+      state.nextAt += Math.round(PACE * (0.75 + Math.random() * 0.5));
+      n++;
+    }
+    return n;
+  }
+  function soon() { var t = Date.now() + 3000; if (!state.nextAt || state.nextAt > t) state.nextAt = t; }
+
   /* ================= routing ================= */
-  var STEPS = [['name', 'You'], ['summit', 'Summit'], ['camps', 'Camps'], ['ai', 'Base Camp']];
+  
   var KNOWN = ['home', 'map', 'approvals', 'log', 'camps', 'gear', 'report', 'summit'];
   function parse() {
     var h = (location.hash || '').replace(/^#\/?/, '');
-    if (!state.onboarded) { if (!/^start-(name|summit|camps|ai)$/.test(h)) h = 'start-' + state.step; }
+    if (!state.onboarded) { if (!/^start-(welcome|name|summit|coords|trailhead)$/.test(h)) h = 'start-' + state.step; }
     else if (!h || /^start-/.test(h)) h = 'home';
     var m = h.match(/^camp-([a-z]+)$/);
     if (m && !camp(m[1])) { h = 'camps'; m = null; }
@@ -117,33 +178,53 @@
   function elevPill() {
     return '<a href="#log" class="elev-pill" aria-label="Elevation ' + f1(elevation()) + ' of ' + state.summit + ' hours a week. Open the trail log.">' + PEAK + '<b>' + f1(elevation()) + '</b><span>/ ' + state.summit + ' h</span></a>';
   }
-  function avatar() { return '<button type="button" class="avatar" data-action="account" aria-label="Account: ' + esc(state.name) + '" aria-haspopup="menu">' + esc(initial()) + '</button>'; }
+  function face() { return state.photo ? '<img src="' + state.photo + '" alt="">' : esc(initial()); }
+  function avatar() { return '<button type="button" class="avatar' + (state.photo ? ' has-photo' : '') + '" data-action="account" aria-label="Account: ' + esc(state.name) + '" aria-haspopup="menu">' + face() + '</button>'; }
   function chip(t) { return '<span class="chip">' + t + '</span>'; }
-  function sherpaDisc(onPine, size) { return '<span class="disc ' + (onPine ? 'disc-mist' : 'disc-pine') + '" style="width:' + size + 'px;height:' + size + 'px"><img src="assets/' + (onPine ? 'icon.svg' : 'icon-white.svg') + '" alt="" style="width:' + Math.round(size * 0.5) + 'px;height:' + Math.round(size * 0.54) + 'px"></span>'; }
+  // Sherpa's mark is a big S, so it never reads as the Apex logo.
+  function sherpaDisc(onPine, size) { return '<span class="disc ' + (onPine ? 'disc-mist' : 'disc-pine') + '" style="width:' + size + 'px;height:' + size + 'px"><span class="s-mark" style="font-size:' + Math.round(size * 0.56) + 'px">S</span></span>'; }
   function campDisc(c, size, dashed) { return '<span class="cdisc' + (dashed ? ' is-dashed' : '') + '" style="width:' + size + 'px;height:' + size + 'px">' + icon(c.icon, Math.round(size * 0.46), PINE, 1.8) + '</span>'; }
 
+  function ticks(max, base, top, x0, x1, summit) {
+    var step = [0.5, 1, 2, 5, 10, 20].filter(function (st) { return max / st <= 3.2; })[0] || 20, out = '';
+    for (var v = step; v < max * 0.93; v += step) {
+      if (Math.abs(v - summit) < step * 0.45) continue;
+      var y = r1(base - v / max * (base - top));
+      out += '<line x1="' + x0 + '" y1="' + y + '" x2="' + x1 + '" y2="' + y + '" class="ln-tick"/><text x="0" y="' + r1(y + 2.5) + '" class="t-tick">' + (v < 1 ? Math.round(v * 60) + 'm' : fh(v) + 'h') + '</text>';
+    }
+    return out;
+  }
   function elevCard(compact) {
-    var h = weeks(), e = elevation(), max = Math.max(state.summit, e) || 1;
-    var W = 224, top = 10, base = compact ? 70 : 92, xs = [8, 60, 112, 164, 216];
-    var ys = h.map(function (v) { return r1(base - v / max * (base - top)); });
-    var pts = xs.map(function (x, i) { return x + ' ' + ys[i]; }).join(' L');
-    var labels = compact ? '' : ['W1', 'W2', 'W3', 'W4', 'W5'].map(function (w, i) { return '<text x="' + xs[i] + '" y="' + (base + 18) + '" text-anchor="middle" class="t-soft' + (i === 4 ? ' t-strong' : '') + '">' + w + '</text>'; }).join('');
-    return '<section class="elev" aria-label="Elevation ' + f1(e) + ' hours back a week, up ' + f1(delta()) + ' this week. Summit is ' + state.summit + '.">' +
-      '<div class="elev-num"><span>' + f1(e) + '</span><small>h</small></div>' +
-      '<div class="elev-row"><span>Elevation</span><b>+' + f1(delta()) + ' this week</b></div>' +
-      '<svg class="elev-chart" viewBox="0 0 ' + W + ' ' + (base + (compact ? 6 : 24)) + '" aria-hidden="true">' +
-      '<line x1="8" y1="' + base + '" x2="216" y2="' + base + '" class="ln-faint"/>' +
-      '<line x1="8" y1="' + r1(base - state.summit / max * (base - top)) + '" x2="216" y2="' + r1(base - state.summit / max * (base - top)) + '" class="ln-summit"/>' +
-      '<text x="216" y="' + r1(base - state.summit / max * (base - top) - 6) + '" text-anchor="end" class="t-strong">Summit ' + state.summit + '</text>' +
-      (e > 0 ? '<path d="M8 ' + base + ' L' + pts + ' L216 ' + base + ' Z" class="area"/><path d="M' + pts + '" class="line"/><circle cx="216" cy="' + ys[4] + '" r="5" class="dot"/>' : '') +
-      labels + '</svg></section>';
+    var e = elevation(), pts = climbPts(), n = pts.length, max = Math.max(state.summit, e) * 1.1 || 1;
+    var W = 224, top = 6, base = compact ? 64 : 84, x0 = 22, x1 = 220, sy = r1(base - state.summit / max * (base - top));
+    var xy = pts.map(function (v, i) { return [n > 1 ? r1(x0 + (x1 - x0) * i / (n - 1)) : x0, r1(base - v / max * (base - top))]; });
+    var line = xy.map(function (q) { return q[0] + ' ' + q[1]; }).join(' L'), last = xy[n - 1], tm = todayMinutes();
+    var sub = !climbing() ? 'Starts at Base Camp' : tm ? '+' + (tm >= 60 ? fh(tm / 60) + ' h' : tm + ' min') + ' today' : 'Sherpa is starting';
+    return '<section class="elev" aria-label="Time saved: ' + f1(e) + ' hours in the last seven days. Summit is ' + state.summit + ' hours.">' +
+      '<div class="elev-num"><span>' + f1(e) + '</span><small>h saved</small></div>' +
+      '<div class="elev-row"><span>This week · summit ' + state.summit + ' h</span><b>' + sub + '</b></div>' +
+      '<svg class="elev-chart" viewBox="0 0 ' + W + ' ' + (base + (compact ? 4 : 16)) + '" aria-hidden="true">' +
+      ticks(max, base, top, x0, x1, state.summit) +
+      '<text x="0" y="' + r1(sy + 2.5) + '" class="t-tick t-sum">' + fh(state.summit) + 'h</text>' +
+      '<line x1="' + x0 + '" y1="' + base + '" x2="' + x1 + '" y2="' + base + '" class="ln-faint"/>' +
+      '<line x1="' + x0 + '" y1="' + sy + '" x2="' + x1 + '" y2="' + sy + '" class="ln-summit"/>' +
+      (n > 1 ? '<path d="M' + x0 + ' ' + base + ' L' + line + ' L' + last[0] + ' ' + base + ' Z" class="area"/><path d="M' + line + '" class="line"/><circle cx="' + last[0] + '" cy="' + last[1] + '" r="3.5" class="dot"/>' : '') +
+      (compact ? '' : '<text x="' + x0 + '" y="' + (base + 12) + '" class="t-soft">Base Camp</text><text x="' + x1 + '" y="' + (base + 12) + '" text-anchor="end" class="t-soft">Now</text>') +
+      '</svg></section>';
   }
 
   function approvalRows(list, onPine) {
     if (!list.length) return '';
     return '<div class="appr-list">' + list.map(function (a) {
-      return '<div class="appr' + (onPine ? ' on-pine' : '') + '"><div class="appr-text"><b>' + esc(a.who) + '</b><span>' + esc(a.what) + '</span></div>' +
-        '<button type="button" class="btn ' + (onPine ? 'ghost-mist' : 'ghost') + ' sm" data-action="approve" data-id="' + a.id + '">' + a.verb + '</button></div>';
+      var open = !!session.apprOpen[a.id], c = camp(a.camp);
+      return '<div class="appr' + (onPine ? ' on-pine' : '') + (open ? ' is-open' : '') + '"><div class="appr-top">' +
+        '<button type="button" class="appr-text" data-action="appr-open" data-id="' + a.id + '" aria-expanded="' + open + '"><b>' + esc(a.who) + '</b><span>' + esc(a.what) + '</span></button>' +
+        '<span class="appr-chev" aria-hidden="true">' + icon('chev', 16, onPine ? MIST : PINE, 2.2) + '</span>' +
+        '<button type="button" class="btn ' + (onPine ? 'ghost-mist' : 'ghost') + ' sm" data-action="approve" data-id="' + a.id + '">' + a.verb + '</button></div>' +
+        (open ? '<div class="appr-more"><div class="appr-kind">' + esc(a.kind) + '</div><p>' + esc(a.detail) + '</p><div class="appr-meta">' + esc(c.name) + ' · ' + esc(toolsLabel(a.camp)) + ' · saves about ' + a.min + ' min</div>' +
+          '<div class="appr-acts"><button type="button" class="btn ' + (onPine ? 'ghost-mist' : 'ghost') + ' sm" data-action="reject" data-id="' + a.id + '">Reject</button>' +
+          '<button type="button" class="btn ' + (onPine ? 'ghost-mist' : 'ghost') + ' sm" data-action="appr-chat" data-id="' + a.id + '">' + icon('chat', 14, onPine ? MIST : PINE, 2) + 'Chat about it</button></div></div>' : '') +
+        '</div>';
     }).join('') + '</div>';
   }
   function approveAllLabel(n) { return n === 3 ? 'Approve all three' : n === 2 ? 'Approve both' : 'Approve it'; }
@@ -170,15 +251,18 @@
 
   function viewPanel(scope, opts) {
     opts = opts || {};
-    var lens = scope === 'home' ? state.lens : (session.campLens[scope] || 'brain');
+    var home = scope === 'home', lens = home ? state.lens : 'brain';
     var full = session.full ? ' is-full' : '';
-    var label = scope === 'home' ? 'Your mountain' : camp(scope).name;
-    return '<section class="view' + full + (opts.ask ? ' has-ask' : '') + (opts.cls ? ' ' + opts.cls : '') + '" data-scope="' + scope + '" data-lens="' + lens + '" aria-label="' + esc(label) + ', ' + lens + ' view">' +
+    var label = home ? 'Your mountain, ' + lens + ' view' : camp(scope).name + ' brain';
+    return '<section class="view' + full + (opts.ask ? ' has-ask' : '') + (opts.cls ? ' ' + opts.cls : '') + '" data-scope="' + scope + '" data-lens="' + lens + '" aria-label="' + esc(label) + '">' +
       '<div class="view-art"></div>' +
       '<div class="view-bar">' +
-      '<div class="seg" role="group" aria-label="View"><button type="button" data-action="lens" data-lens="map" aria-pressed="' + (lens === 'map') + '">Map</button><button type="button" data-action="lens" data-lens="brain" aria-pressed="' + (lens === 'brain') + '">Brain</button></div>' +
+      (home ? '<div class="seg" role="group" aria-label="View"><button type="button" data-action="lens" data-lens="map" aria-pressed="' + (lens === 'map') + '">Map</button><button type="button" data-action="lens" data-lens="brain" aria-pressed="' + (lens === 'brain') + '">Brain</button></div>' : '') +
       (opts.noExpand ? '' : '<button type="button" class="icon-btn" data-action="full" aria-label="' + (session.full ? 'Exit full screen' : 'Full screen') + '">' + icon(session.full ? 'shrink' : 'expand', 18, PINE, 2.2) + '</button>') +
       '</div>' +
+      '<div class="view-ctl" role="group" aria-label="Move around"><button type="button" data-action="zoom" data-f="1.5" aria-label="Zoom in">' + icon('plus', 18, PINE, 2.2) + '</button>' +
+      '<button type="button" data-action="zoom" data-f="0.667" aria-label="Zoom out">' + icon('minus', 18, PINE, 2.2) + '</button>' +
+      '<button type="button" data-action="recenter" aria-label="Reset the view">' + icon('target', 18, PINE, 2) + '</button></div>' +
       (opts.ask ? askBar(opts.ask, true) : '') +
       '</section>';
   }
@@ -191,83 +275,66 @@
   }
 
   function connectBlock(c) {
-    var tool = session.pendingTool[c.id] || c.tools[0];
-    var busy = session.connecting === c.id;
+    var have = toolsOf(c.id), left = c.tools.filter(function (t) { return have.indexOf(t) < 0; });
+    if (!left.length) return '<div class="connect"><p class="fine">Every ' + esc(c.name) + ' connector is in.</p></div>';
+    var tool = left.indexOf(session.pendingTool[c.id]) > -1 ? session.pendingTool[c.id] : left[0], busy = session.connecting === c.id;
     return '<div class="connect">' +
-      '<div class="chips" role="radiogroup" aria-label="' + esc(c.name) + ' tool">' + c.tools.map(function (t) {
-        return '<button type="button" class="chipbtn" role="radio" aria-checked="' + (t === tool) + '" data-action="pick-tool" data-camp="' + c.id + '" data-tool="' + esc(t) + '"' + (busy ? ' disabled' : '') + '>' + esc(t) + '</button>';
+      '<div class="chips" role="radiogroup" aria-label="' + esc(c.name) + ' connector">' + c.tools.map(function (t) {
+        var on = have.indexOf(t) > -1;
+        return '<button type="button" class="chipbtn' + (on ? ' is-on' : '') + '" role="radio" aria-checked="' + (!on && t === tool) + '" data-action="pick-tool" data-camp="' + c.id + '" data-tool="' + esc(t) + '"' + (busy || on ? ' disabled' : '') + '>' + (on ? '\u2713 ' : '') + esc(t) + '</button>';
       }).join('') + '</div>' +
-      '<button type="button" class="btn primary block" data-action="connect" data-camp="' + c.id + '"' + (busy ? ' disabled aria-busy="true"' : '') + '>' + (busy ? 'Connecting ' + esc(tool) + '…' : 'Connect ' + esc(tool)) + '</button>' +
-      '<p class="fine">Demo. No account gets connected.</p></div>';
+      '<button type="button" class="btn primary block" data-action="connect" data-camp="' + c.id + '"' + (busy ? ' disabled aria-busy="true"' : '') + '>' + (busy ? 'Connecting ' + esc(tool) + '\u2026' : (have.length ? 'Add ' : 'Connect ') + esc(tool)) + '</button>' +
+      '<p class="fine">' + (have.length ? 'Add every tool you use here. ' : 'You can add more than one. ') + 'Demo. No account gets connected.</p></div>';
   }
 
   /* ================= onboarding ================= */
-  function stepsNav(step) {
-    var idx = STEPS.map(function (s) { return s[0]; }).indexOf(step);
-    return STEPS.map(function (s, i) {
-      if (i < idx) return '<span class="step is-done">' + icon('check', 14, PINE, 2.5) + s[1] + '</span>';
-      if (i === idx) return '<span class="step is-on" aria-current="step">' + (i + 1) + ' · ' + s[1] + '</span>';
-      return '<span class="step">' + (i + 1) + ' · ' + s[1] + '</span>';
-    }).join('');
+  // Welcome, your name, your summit, your coordinates, then the trailhead. Camps and Base Camp come after,
+  // on the mountain itself.
+  function photoPick(size) {
+    return '<label class="photo-pick"><input id="photo-in" type="file" accept="image/*" class="sr">' +
+      '<span class="avatar" style="width:' + size + 'px;height:' + size + 'px;font-size:' + Math.round(size * 0.4) + 'px">' + (state.photo ? '<img src="' + state.photo + '" alt="">' : esc(initial())) + '</span>' +
+      '<span class="photo-pick-t">' + (state.photo ? 'Change photo' : 'Add a photo') + '</span></label>';
   }
   function startBody(step) {
     if (step === 'name') {
-      return '<h1>What do we call you?</h1><p class="lede">I\'m Sherpa, your guide. You\'re the climber.</p>' +
-        '<form class="name-form" data-form="name"><label class="sr" for="you-name">Your first name</label>' +
+      return '<h1>What\'s your name?</h1>' +
+        '<form class="name-form" data-form="name">' + photoPick(72) + '<label class="sr" for="you-name">Your first name</label>' +
         '<input id="you-name" name="name" class="big-input" type="text" autocomplete="given-name" placeholder="Your first name" value="' + esc(state.name) + '">' +
-        (session.nameError ? '<p class="err" role="alert">Add your first name so I know what to call you.</p>' : '') +
-        '<button type="submit" class="btn primary lg">Next</button></form>';
+        (session.nameError ? '<p class="err" role="alert">Add your first name to keep going.</p>' : '') +
+        '<div class="row gap12"><button type="submit" class="btn primary lg">Next</button><button type="button" class="btn text" data-action="step" data-to="welcome">Back</button></div></form>';
     }
     if (step === 'summit') {
-      return '<h1>Name your summit</h1><p class="lede">Hours back a week. That\'s your summit.</p>' +
+      return '<h1>How much time would you like to save each week?</h1>' +
         '<div class="stepper"><button type="button" class="round-btn" data-action="hours" data-d="-1" aria-label="Fewer hours">' + icon('minus', 20, PINE, 2.5) + '</button>' +
         '<output class="stepper-num" aria-live="polite">' + state.summit + '</output>' +
         '<button type="button" class="round-btn" data-action="hours" data-d="1" aria-label="More hours">' + icon('plus', 20, PINE, 2.5) + '</button><span class="stepper-unit">hours<br>a week</span></div>' +
-        '<div class="chips" role="group" aria-label="Quick picks">' + [5, 10, 15, 20, 30].map(function (n) { return '<button type="button" class="chipbtn" aria-pressed="' + (state.summit === n) + '" data-action="set-hours" data-n="' + n + '">' + n + '</button>'; }).join('') + '</div>' +
-        '<div class="label">What for?</div><div class="chips" role="group" aria-label="What for">' + D.WHY.map(function (w) { return '<button type="button" class="chipbtn" aria-pressed="' + (state.why === w) + '" data-action="set-why" data-why="' + esc(w) + '">' + esc(w) + '</button>'; }).join('') + '</div>' +
-        '<div class="row gap12"><button type="button" class="btn primary lg" data-action="step" data-to="camps">Plot my route</button><button type="button" class="btn text" data-action="step" data-to="name">Back</button></div>';
+        '<div class="chips" role="group" aria-label="Quick picks">' + [5, 10, 15, 20, 30].map(function (n) { return '<button type="button" class="chipbtn" aria-pressed="' + (state.summit === n) + '" data-action="set-hours" data-n="' + n + '">' + n + ' h</button>'; }).join('') + '</div>' +
+        '<h2 class="start-h2">What do you want the extra time for?</h2><div class="chips" role="group" aria-label="What for">' + D.WHY.map(function (w) { return '<button type="button" class="chipbtn" aria-pressed="' + (state.why === w) + '" data-action="set-why" data-why="' + esc(w) + '">' + esc(w) + '</button>'; }).join('') + '</div>' +
+        '<div class="row gap12"><button type="button" class="btn primary lg" data-action="step" data-to="coords">Next</button><button type="button" class="btn text" data-action="step" data-to="name">Back</button></div>';
     }
-    if (step === 'camps') {
-      var core = D.CAMPS.filter(function (c) { return c.core; });
-      var any = core.some(function (c) { return isOn(c.id); });
-      var proj = r1(core.reduce(function (a, c) { return a + (isOn(c.id) ? c.hours : 0); }, 0));
-      return '<h1>Make camp</h1><p class="lede">Connect your tools. Each one is a camp on the way up.</p>' +
-        '<div class="camp-rows">' + core.map(function (c) {
-          var on = isOn(c.id), open = session.openRow === c.id && !on;
-          return '<div class="camp-row' + (open ? ' is-open' : '') + (on ? ' is-on' : '') + '">' +
-            '<button type="button" class="camp-row-head" data-action="row" data-camp="' + c.id + '" aria-expanded="' + open + '"' + (on ? ' disabled' : '') + '>' +
-            '<span class="tick' + (on ? ' is-on' : '') + '">' + (on ? icon('check', 12, MIST, 3) : '') + '</span>' +
-            '<span class="grow col"><b>' + esc(c.name) + '</b><span class="soft">' + (on ? esc(toolOf(c.id)) : esc(c.tools.join(', '))) + '</span></span>' +
-            '<span class="soft">' + (on ? 'Done' : c.est) + '</span></button>' +
-            (open ? connectBlock(c) : '') + '</div>';
-        }).join('') + '</div>' +
-        '<div class="proj"><span>Projected elevation</span><b>' + f1(proj) + ' h a week</b></div>' +
-        '<div class="row gap12"><button type="button" class="btn primary lg" data-action="step" data-to="ai"' + (any ? '' : ' disabled') + '>Continue</button><button type="button" class="btn text" data-action="step" data-to="summit">Back</button></div>' +
-        (any ? '' : '<p class="fine">Make at least one camp to continue.</p>');
-    }
-    // ai
-    return '<h1>Pick your gear</h1><p class="lede">Base Camp runs on any AI. Switch any time. Your memories stay yours.</p>' +
-      '<div class="tiles2" role="radiogroup" aria-label="AI model">' + D.MODELS.map(function (m) {
-        return '<button type="button" class="tile-radio" role="radio" aria-checked="' + (state.model === m.id) + '" data-action="model" data-model="' + m.id + '"><b>' + m.id + '</b><span>' + m.by + '</span></button>';
-      }).join('') + '</div>' +
-      '<div class="row gap12"><button type="button" class="btn primary lg" data-action="finish">Start climbing</button><button type="button" class="btn text" data-action="step" data-to="camps">Back</button></div>';
-  }
-  function startArt(step) {
-    if (step === 'name') {
-      return '<section class="sherpa-intro">' + '<span class="intro-mark"><img src="assets/icon.svg" alt=""></span>' +
-        '<div class="intro-name">Sherpa</div><div class="intro-sub">Your guide</div>' +
-        '<p class="intro-quote">Tell me where you want to go. I\'ll get you there.</p></section>';
-    }
-    return '<section class="view is-static" data-scope="onboard" data-lens="map" aria-label="Your route"><div class="view-art"></div></section>';
+    // coordinates: the plan at a glance
+    return '<h1>Your coordinates</h1>' +
+      '<dl class="coords">' +
+      '<div><dt>Climber</dt><dd><span class="avatar sm">' + (state.photo ? '<img src="' + state.photo + '" alt="">' : esc(initial())) + '</span>' + esc(state.name) + '</dd></div>' +
+      '<div><dt>Summit</dt><dd>' + state.summit + ' hours a week</dd></div>' +
+      '<div><dt>For</dt><dd>' + esc(state.why) + '</dd></div>' +
+      '<div><dt>Route</dt><dd>Trailhead · four camps · Base Camp · summit</dd></div></dl>' +
+      '<div class="row gap12"><button type="button" class="btn primary lg" data-action="step" data-to="trailhead">Looks right</button><button type="button" class="btn text" data-action="step" data-to="summit">Back</button></div>';
   }
   function renderStart(r) {
-    if (desk()) {
-      return '<header class="d-head">' + logo(30) + '<nav class="d-steps" aria-label="Setup steps">' + stepsNav(r.step) + '</nav>' + chip('Example data') + '</header>' +
-        '<main class="d-start" id="main"><div class="start-copy">' + startBody(r.step) + '</div><div class="start-art">' + startArt(r.step) + '</div></main>';
+    var step = r.step;
+    if (step === 'welcome' || step === 'trailhead') {
+      var hello = step === 'welcome';
+      return '<main class="hello" id="main"><h1>' + (hello ? 'Are you ready to reach the summit?' : 'Welcome to the trailhead.') + '</h1>' +
+        '<button type="button" class="btn primary lg" data-action="' + (hello ? 'step' : 'start-climb') + '" data-to="name">' + (hello ? 'Let’s go' : 'Start the climb') + '</button></main>';
     }
-    var n = STEPS.map(function (s) { return s[0]; }).indexOf(r.step) + 1;
-    return '<header class="p-head">' + logo(24) + '<div class="row gap10">' + chip('Example data') + '<span class="step-count">' + n + ' of 4</span></div></header>' +
-      '<main class="p-main p-start" id="main"><div class="p-start-art">' + startArt(r.step) + '</div>' + startBody(r.step) + '</main>';
+    var art = step === 'coords' ? '<section class="view is-static" data-scope="onboard" data-lens="map" aria-label="Your route"><div class="view-art"></div></section>' : '';
+    if (desk()) {
+      return '<header class="d-head">' + logo(30) + '</header>' +
+        '<main class="d-start' + (art ? '' : ' one') + '" id="main"><div class="start-copy">' + startBody(step) + '</div>' + (art ? '<div class="start-art">' + art + '</div>' : '') + '</main>';
+    }
+    return '<header class="p-head">' + logo(24) + '</header>' +
+      '<main class="p-main p-start" id="main">' + (art ? '<div class="p-start-art">' + art + '</div>' : '') + startBody(step) + '</main>';
   }
 
   /* ================= app screens ================= */
@@ -276,7 +343,7 @@
       var on = r.section === n[0];
       return '<a href="#' + n[0] + '" class="nav-link' + (on ? ' is-on' : '') + '"' + (on ? ' aria-current="page"' : '') + '>' + n[1] + '</a>';
     }).join('');
-    return '<header class="d-head">' + logo(30) + '<nav class="d-nav" aria-label="Main">' + nav + '</nav><div class="row gap12">' + chip('Example data') + elevPill() + avatar() + '</div></header>';
+    return '<header class="d-head">' + logo(30) + '<nav class="d-nav" aria-label="Main">' + nav + '</nav><div class="row gap12">' + elevPill() + avatar() + '</div></header>';
   }
   function pHeader(r, back) {
     var left = back ? '<a href="#' + back[0] + '" class="back">' + icon('back', 16, PINE, 2.5) + back[1] + '</a>' : logo(24);
@@ -292,6 +359,7 @@
     }).join('') + '</nav>';
   }
 
+  function today() { return new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }); }
   function sherpaHead(sub) {
     return '<div class="sp-head">' + sherpaDisc(true, 44) + '<div class="grow col"><b>Sherpa</b><span>' + esc(sub) + '</span></div>' +
       '<button type="button" class="icon-btn on-pine" data-action="checkin" aria-label="Morning check-in">' + icon('phone', 18, MIST, 2) + '</button></div>';
@@ -300,34 +368,63 @@
 
   function homeSherpaPanel() {
     var list = openApprovals(), t = nextTrail(), recent = entries().filter(function (e) { return e.day === 'Today'; }).slice(0, 3);
-    return '<aside class="d-right pine" aria-label="Sherpa">' + sherpaHead('Your guide') +
+    if (!climbing()) return '<aside class="d-right pine" aria-label="Sherpa">' + sherpaHead(today()) + startSteps(true) + '</aside>';
+    return '<aside class="d-right pine" aria-label="Sherpa">' + sherpaHead(today()) +
       '<p class="sp-say">' + greeting() + ', ' + esc(state.name) + '. ' + needsLine(list.length) + '</p>' +
       approvalRows(list, true) +
       (list.length > 1 ? '<button type="button" class="btn mist block" data-action="approve-all">' + approveAllLabel(list.length) + '</button>' : '') +
       (t ? '<div class="label on-pine">Next trail</div>' + trailCard(t, true) : (elevation() >= state.summit ? '' : '<div class="label on-pine">Next trail</div><p class="sp-note">' + (unexplored().length ? 'Explore a new camp to find more trails.' : 'No new trails this week.') + '</p>')) +
-      '<div class="label on-pine">Trail log</div><div class="mini-log">' + recent.map(function (e) {
+      '<div class="label on-pine">Trail log</div><div class="mini-log">' + (recent.length ? recent.map(function (e) {
         return '<a href="#log" class="ml-row"><span class="ml-time">' + e.time + '</span><span class="grow">' + esc(e.text) + '</span><b>' + (e.undone ? 'Undone' : '+' + e.min + 'm') + '</b></a>';
-      }).join('') + '</div><div class="ml-total"><span>Today so far</span><b>+' + todayMinutes() + ' min</b></div></aside>';
+      }).join('') : '<p class="sp-note">Sherpa is getting started. Every task it finishes lands here.</p>') + '</div><div class="ml-total"><span>Today so far</span><b>+' + todayMinutes() + ' min</b></div></aside>';
   }
 
-  function campsList() {
-    var on = D.CAMPS.filter(function (c) { return isOn(c.id); }), off = unexplored();
-    return '<div class="label">Camps</div><div class="clist">' + on.map(function (c) {
-      return '<a href="#camp-' + c.id + '" class="crow"><span class="dot"></span><span class="grow">' + esc(c.name) + '</span><span class="soft num">' + f1(campHours(c.id)) + ' h</span></a>';
-    }).join('') + '</div>' +
-      (off.length ? '<div class="label">Unexplored</div><div class="clist">' + off.map(function (c) {
-        return '<div class="crow is-off"><span class="dot is-off"></span><span class="grow col"><b>' + esc(c.name) + '</b><span class="soft">+' + fh(c.hours) + ' h/wk</span></span><button type="button" class="btn ghost sm" data-action="explore" data-camp="' + c.id + '">Explore</button></div>';
+  function startSteps(onPine) {
+    var off = D.CAMPS.filter(function (c) { return c.core && !isOn(c.id); }), n = coreMade();
+    var say = n === 0 ? 'Make your first camp. Connect a tool you already use.' : off.length ? words(n) + (n === 1 ? ' camp' : ' camps') + ' made. Make another, or head for Base Camp.' : 'Every camp is made. Base Camp is next.';
+    return '<p class="sp-say">' + greeting() + ', ' + esc(state.name) + '. ' + say + '</p>' +
+      (off.length ? '<div class="appr-list">' + off.map(function (c) {
+        return '<div class="appr' + (onPine ? ' on-pine' : '') + '"><div class="appr-text"><b>' + esc(c.name) + '</b><span>' + esc(c.tools.join(', ')) + '</span></div><button type="button" class="btn ' + (onPine ? 'ghost-mist' : 'ghost') + ' sm" data-action="explore" data-camp="' + c.id + '">Make camp</button></div>';
       }).join('') + '</div>' : '') +
-      '<div class="label">Protected</div><div class="protect">' + esc(state.protect) + '</div>';
+      (n ? '<button type="button" class="btn ' + (onPine ? 'mist' : 'primary') + ' block" data-action="basecamp">Make Base Camp</button>' : '');
+  }
+  function campIco(c, off) { return '<span class="crow-ico' + (off ? ' is-off' : '') + '">' + icon(c.icon, 16, PINE, 1.9) + '</span>'; }
+  function campsList() {
+    var on = D.CAMPS.filter(function (c) { return isOn(c.id); }), off = unexplored().filter(function (c) { return climbing() || c.core; });
+    return (on.length ? '<div class="label">Camps</div><div class="clist">' + on.map(function (c) {
+      return '<a href="#camp-' + c.id + '" class="crow">' + campIco(c) + '<span class="grow">' + esc(c.name) + '</span><span class="soft num">' + f1(campHours(c.id)) + ' h</span></a>';
+    }).join('') + '</div>' : '') +
+      (off.length ? '<div class="label">' + (climbing() ? 'Unexplored' : 'On the way to Base Camp') + '</div><div class="clist">' + off.map(function (c) {
+        return '<div class="crow is-off">' + campIco(c, true) + '<span class="grow col"><b>' + esc(c.name) + '</b><span class="soft">+' + fh(c.hours) + ' h/wk</span></span><button type="button" class="btn ghost sm" data-action="explore" data-camp="' + c.id + '">' + (c.core ? 'Make camp' : 'Explore') + '</button></div>';
+      }).join('') + '</div>' : '');
   }
 
+  // A trail report is ready every evening at 5. In the demo a day of work runs in minutes, so one is also
+  // ready once Sherpa has finished eight more tasks since you last read one.
+  var REPORT_HOUR = 17, REPORT_TASKS = 8;
+  function reportReady() {
+    if (!climbing()) return false;
+    var r = state.reportRead || { at: state.baseAt, n: 0 }, n = liveDone().length, eve = startOfDay() + REPORT_HOUR * 3600000;
+    return n > r.n && (n - r.n >= REPORT_TASKS || (Date.now() >= eve && r.at < eve));
+  }
+  function markReportRead() { state.reportRead = { at: Date.now(), n: liveDone().length }; session.reportShown = false; save(); }
+  function reportPop() {
+    if (!reportReady()) return '';
+    var tm = todayMinutes(), isNew = !session.reportShown; session.reportShown = true;
+    return '<div class="rp-pop' + (isNew ? ' is-new' : '') + '" role="status"><a href="#report" class="rp-pop-main">' + sherpaDisc(true, 40) +
+      '<span class="grow col"><b>Your trail report</b><span>Ready. ' + (tm >= 60 ? f1(tm / 60) + ' h' : tm + ' min') + ' saved today.</span></span><span class="btn mist sm">Read</span></a>' +
+      '<button type="button" class="icon-btn on-pine" data-action="report-later" aria-label="Dismiss the trail report">' + icon('close', 14, MIST, 2.5) + '</button></div>';
+  }
   function renderHome(r) {
     if (desk()) {
-      return dHeader(r) + '<main class="d-grid" id="main"><aside class="d-left">' + elevCard() + campsList() + '</aside>' +
+      return dHeader(r) + '<main class="d-grid" id="main"><aside class="d-left">' + reportPop() + elevCard() + campsList() + '</aside>' +
         '<div class="d-center">' + viewPanel('home', { ask: 'Ask Sherpa' }) + '</div>' + homeSherpaPanel() + '</main>';
     }
     var n = openApprovals().length, t = nextTrail();
-    return pHeader(r) + '<main class="p-main" id="main">' + elevCard(true) +
+    if (!climbing()) return pHeader(r) + '<main class="p-main" id="main">' + elevCard(true) + '<div class="sp-card pine">' + sherpaHead(today()) + startSteps(true) + '</div>' +
+      viewPanel('home', { cls: 'is-preview', noExpand: true }) + '<a href="#map" class="link-row">Open the full map ' + icon('arrow', 16, PINE, 2.2) + '</a>' +
+      '<div class="p-camps">' + campsList() + '</div></main>' + pTabs(r);
+    return pHeader(r) + '<main class="p-main" id="main">' + reportPop() + elevCard(true) +
       '<a href="#approvals" class="need"><span class="need-n">' + n + '</span><span class="grow">' + (n ? 'need you' : 'All clear') + '</span><span class="btn primary sm">' + (n ? 'Review' : 'Open') + '</span></a>' +
       viewPanel('home', { cls: 'is-preview', noExpand: true }) +
       '<a href="#map" class="link-row">Open the full map ' + icon('arrow', 16, PINE, 2.2) + '</a>' +
@@ -353,10 +450,11 @@
   function renderCamps(r) {
     var tiles = D.CAMPS.map(function (c) {
       var on = isOn(c.id);
-      if (on) return '<a href="#camp-' + c.id + '" class="ctile">' + campDisc(c, 48) + '<b>' + esc(c.name) + '</b><span class="soft">' + esc(toolOf(c.id)) + '</span>' +
-        '<span class="ctile-num">' + f1(campHours(c.id)) + ' h<small>/wk</small></span><span class="soft">Level ' + level(c) + ' · ' + c.memories.toLocaleString('en-US') + ' memories</span></a>';
-      return '<div class="ctile is-off">' + campDisc(c, 48, true) + '<b>' + esc(c.name) + '</b><span class="soft">' + (c.core ? 'Not connected' : 'Unexplored') + '</span>' +
-        '<span class="ctile-num">+' + fh(c.hours) + ' h<small>/wk</small></span><button type="button" class="btn ghost sm" data-action="explore" data-camp="' + c.id + '">' + (c.core ? 'Make camp' : 'Explore') + '</button></div>';
+      if (on) return '<a href="#camp-' + c.id + '" class="ctile is-on">' + campDisc(c, 48) + '<b>' + esc(c.name) + '</b><span class="soft">' + esc(toolsLabel(c.id)) + '</span>' +
+        '<span class="ctile-num">' + f1(campHours(c.id)) + ' h<small> saved</small></span><span class="soft">' + c.memories.toLocaleString('en-US') + ' memories</span></a>';
+      var locked = !c.core && !climbing();
+      return '<div class="ctile is-off">' + campDisc(c, 48, true) + '<b>' + esc(c.name) + '</b><span class="soft">' + (c.core ? 'Not connected' : locked ? 'After Base Camp' : 'Unexplored') + '</span>' +
+        '<span class="ctile-num">+' + fh(c.hours) + ' h<small>/wk</small></span><button type="button" class="btn ghost sm" data-action="explore" data-camp="' + c.id + '"' + (locked ? ' disabled' : '') + '>' + (c.core ? 'Make camp' : 'Explore') + '</button></div>';
     }).join('');
     var body = '<h1>Camps</h1><div class="ctiles">' + tiles + '</div>';
     if (desk()) return dHeader(r) + '<main class="d-page" id="main">' + body + '</main>';
@@ -371,15 +469,18 @@
       }).join('') + '</div>';
   }
   function campInfo(c) {
-    var pct = Math.round((c.memories % 500) / 500 * 100);
-    return '<h1 class="camp-h1">' + esc(c.name) + '</h1><div class="soft">Level ' + level(c) + ' camp · ' + c.memories.toLocaleString('en-US') + ' memories · ' + esc(toolOf(c.id)) + '</div>' +
-      '<div class="label">Next level</div><div class="bar"><span style="width:' + pct + '%"></span></div><div class="soft sm">' + toNext(c) + ' to level ' + (level(c) + 1) + '</div>' +
-      '<div class="label">This week</div><div class="row gap24"><div class="col"><span class="stat">+' + f1(campHours(c.id)) + ' h</span><span class="soft sm">back</span></div><div class="col"><span class="stat">' + entries().filter(function (e) { return e.camp === c.id && !e.undone; }).length * 4 + '</span><span class="soft sm">tasks handled</span></div></div>' +
+    var have = toolsOf(c.id), left = c.tools.filter(function (t) { return have.indexOf(t) < 0; });
+    return '<h1 class="camp-h1">' + esc(c.name) + '</h1><div class="soft">' + c.memories.toLocaleString('en-US') + ' memories · ' + esc(toolsLabel(c.id)) + '</div>' +
+      '<div class="label">This week</div><div class="row gap24"><div class="col"><span class="stat">+' + f1(campHours(c.id)) + ' h</span><span class="soft sm">saved</span></div><div class="col"><span class="stat">' + weekDone(c.id).length + '</span><span class="soft sm">tasks done</span></div></div>' +
+      '<div class="label">Connectors</div><div class="conn-list">' + have.map(function (t) {
+        return '<div class="conn-row"><span class="conn-dot" aria-hidden="true"></span><b class="grow">' + esc(t) + '</b>' + (have.length > 1 ? '<button type="button" class="btn text sm" data-action="disconnect" data-camp="' + c.id + '" data-tool="' + esc(t) + '" aria-label="Remove ' + esc(t) + '">Remove</button>' : '<span class="soft sm">Connected</span>') + '</div>';
+      }).join('') + '</div>' +
+      (left.length ? connectBlock(c) : '') +
       permGroup(c);
   }
   function campSherpa(c) {
     var t = nextTrail(c.id), waiting = openApprovals().filter(function (a) { return a.camp === c.id; }), today = entries().filter(function (e) { return e.camp === c.id && e.day === 'Today'; });
-    return sherpaHead(t ? 'Found a new trail' : 'Your guide') +
+    return sherpaHead(t ? 'Found a new trail' : today()) +
       (t ? trailCard(t, true) : '<p class="sp-say">' + esc(c.name) + ' is running well. No new trails here this week.</p>') +
       (waiting.length ? '<div class="label on-pine">Waiting on you here</div>' + approvalRows(waiting, true) : '') +
       '<div class="label on-pine">Today in ' + esc(c.name) + '</div><div class="mini-log">' + (today.length ? today.map(function (e) {
@@ -406,21 +507,22 @@
     var q = session.logQuery.toLowerCase();
     var shown = all.filter(function (e) { return (session.logCamp === 'all' || e.camp === session.logCamp) && (!q || (e.text + ' ' + camp(e.camp).name + ' ' + e.source).toLowerCase().indexOf(q) > -1); });
     function group(day) { var g = shown.filter(function (e) { return e.day === day; }); return g.length ? '<div class="label">' + day + '</div><div class="log-list">' + logRows(g, !desk()) + '</div>' : ''; }
-    var lists = group('Today') + group('Yesterday') || '<p class="lede">Nothing matches.</p>';
+    var days = []; shown.forEach(function (e) { if (days.indexOf(e.day) < 0) days.push(e.day); });
+    var lists = days.map(group).join('') || (all.length ? '<p class="lede">Nothing matches.</p>' : '<p class="lede">Nothing yet. Every task Sherpa finishes for you lands here, with the time it saved.</p>');
     if (desk()) {
       var sel = all.filter(function (e) { return e.id === session.logSel; })[0] || shown[0] || all[0];
       if (sel) session.logSel = sel.id;
       return dHeader(r) + '<main class="d-grid" id="main"><aside class="d-left"><div class="hero-num">+' + f1(elevation()) + ' h</div><div class="soft">This week</div>' +
         '<div class="label">By camp</div><div class="filters" role="group" aria-label="Filter by camp">' + cats.map(function (k) {
           return '<button type="button" class="filter" aria-pressed="' + (session.logCamp === k[0]) + '" data-action="log-camp" data-camp="' + k[0] + '"><span>' + esc(k[1]) + '</span><span class="num">' + f1(k[2]) + '</span></button>';
-        }).join('') + '</div><a href="#report" class="btn ghost block">Friday trail report</a></aside>' +
+        }).join('') + '</div><a href="#report" class="btn ghost block">Trail report</a></aside>' +
         '<section class="d-center card-pane"><form class="search" data-form="log-search" role="search"><label class="sr" for="log-q">Search the trail log</label><input id="log-q" type="search" placeholder="Search the trail log" value="' + esc(session.logQuery) + '"></form><div class="log-scroll">' + lists + '</div></section>' +
         '<aside class="d-right pine" aria-label="Receipt">' + (sel ? receipt(sel) : '') + '</aside></main>';
     }
     return pHeader(r) + '<main class="p-main" id="main"><h1>Trail log</h1><div class="row base gap8"><span class="stat">+' + f1(elevation()) + ' h</span><span class="soft">this week</span></div>' +
       '<div class="chips scroll-x" role="group" aria-label="Filter by camp">' + cats.map(function (k) {
         return '<button type="button" class="chipbtn" aria-pressed="' + (session.logCamp === k[0]) + '" data-action="log-camp" data-camp="' + k[0] + '">' + esc(k[0] === 'all' ? 'All' : camp(k[0]).short) + '</button>';
-      }).join('') + '</div>' + lists + '<a href="#report" class="btn ghost block">Friday trail report</a></main>' + pTabs(r);
+      }).join('') + '</div>' + lists + '<a href="#report" class="btn ghost block">Trail report</a></main>' + pTabs(r);
   }
   function receipt(e) {
     return '<h2 class="rc-title">' + esc(e.text) + '</h2><div class="rc-meta">' + esc(camp(e.camp).name) + ' · ' + e.day + ', ' + e.time + '</div>' +
@@ -433,16 +535,22 @@
   function renderReport(r) {
     var on = D.CAMPS.filter(function (c) { return isOn(c.id); }), max = Math.max.apply(null, on.map(function (c) { return campHours(c.id); }).concat([1]));
     var t = nextTrail(), u = unexplored()[0];
-    var next = t ? 'Hand me "' + t.title.toLowerCase() + '" for about +' + fh(t.hours) + ' h.' : u ? 'Explore ' + u.name + ' for about +' + fh(u.hours) + ' h.' : 'Hold the line. You are near the top.';
-    var body = '<article class="report"><header class="rp-head">' + sherpaDisc(false, 44) + '<div class="grow col"><b>Sherpa</b><span class="soft">Friday trail report · Example data</span></div>' +
+    if (!climbing() && u && !u.core) u = null;
+    var next = t ? 'Hand me "' + t.title.toLowerCase() + '" for about +' + fh(t.hours) + ' h.' : u ? (u.core ? 'Make camp in ' : 'Explore ') + u.name + ' for about +' + fh(u.hours) + ' h.' : !climbing() ? 'Make Base Camp to start the climb.' : 'Hold the line. You are near the top.';
+    // A new report every evening: what Sherpa did today, where the week stands, and the one thing to do next.
+    markReportRead();
+    var a0 = startOfDay(), today = liveDone().filter(function (d) { return d.ts >= a0; }), tm = todayMinutes(), n = openApprovals().length;
+    function minToday(id) { return today.filter(function (d) { return d.camp === id; }).reduce(function (s, d) { return s + d.min; }, 0); }
+    var maxT = Math.max.apply(null, on.map(function (c) { return minToday(c.id); }).concat([1]));
+    var body = '<article class="report"><header class="rp-head">' + sherpaDisc(false, 44) + '<div class="grow col"><b>Trail report</b><span class="soft">' + WEEKDAYS[new Date().getDay()] + '. A new one every evening.</span></div>' +
       '<a href="#log" class="icon-btn" aria-label="Close">' + icon('close', 16, PINE, 2.5) + '</a></header>' +
-      '<div class="rp-hero"><span>' + f1(elevation()) + '</span><b>hours back</b></div><p class="soft">Up ' + f1(delta()) + '. ' + (toGo() > 0 ? fh(toGo()) + ' to the summit.' : 'Summit reached.') + '</p>' +
-      '<div class="label">By camp</div><div class="bars">' + on.map(function (c) {
-        return '<div class="bar-row"><span class="br-name">' + esc(c.name) + '</span><span class="br-track"><span style="width:' + Math.round(campHours(c.id) / max * 100) + '%"></span></span><b class="num">' + f1(campHours(c.id)) + '</b></div>';
-      }).join('') + '</div>' +
-      '<div class="label">The week</div><p>' + todayMinutes() + ' minutes back today. ' + (state.approvals.a1 ? 'Sarah has her follow-up.' : 'Halcyon signed.') + '</p>' +
-      '<div class="label">Next week</div><p>' + esc(next) + '</p>' +
-      '<div class="rp-actions">' + (t ? '<button type="button" class="btn primary block lg" data-action="take" data-id="' + t.id + '">Hand it over</button>' : u ? '<button type="button" class="btn primary block lg" data-action="explore" data-camp="' + u.id + '">Explore ' + esc(u.name) + '</button>' : '') +
+      '<div class="rp-hero"><span>' + (tm >= 60 ? f1(tm / 60) : tm) + '</span><b>' + (tm >= 60 ? 'hours' : 'minutes') + ' saved today</b></div><p class="soft">' + f1(elevation()) + ' h this week. ' + (toGo() > 0 ? fh(toGo()) + ' h to the summit.' : 'Summit reached.') + '</p>' +
+      (on.length && tm ? '<div class="label">Today by camp</div><div class="bars">' + on.filter(function (c) { return minToday(c.id); }).map(function (c) {
+        return '<div class="bar-row"><span class="br-name">' + esc(c.name) + '</span><span class="br-track"><span style="width:' + Math.round(minToday(c.id) / maxT * 100) + '%"></span></span><b class="num">' + minToday(c.id) + ' min</b></div>';
+      }).join('') + '</div>' : '') +
+      '<div class="label">Today</div><p>' + (today.length === 1 ? 'One task done.' : today.length + ' tasks done.') + (state.approvals.a1 ? ' Sarah has her follow-up.' : '') + (n ? ' ' + needsLine(n) : '') + '</p>' +
+      '<div class="label">Tomorrow</div><p>' + esc(next) + '</p>' +
+      '<div class="rp-actions">' + (t ? '<button type="button" class="btn primary block lg" data-action="take" data-id="' + t.id + '">Hand it over</button>' : !u && !climbing() && coreMade() ? '<button type="button" class="btn primary block lg" data-action="basecamp">Make Base Camp</button>' : u ? '<button type="button" class="btn primary block lg" data-action="explore" data-camp="' + u.id + '">' + (u.core ? 'Make camp in ' : 'Explore ') + esc(u.name) + '</button>' : '') +
       '<a href="#log" class="btn text block">Open trail log</a></div></article>';
     if (desk()) return dHeader(r) + '<main class="d-page center" id="main">' + body + '</main>';
     return pHeader(r) + '<main class="p-main" id="main">' + body + '</main>' + pTabs(r);
@@ -450,14 +558,12 @@
 
   function renderGear(r) {
     var body = '<h1>Gear</h1>' +
-      '<div class="label">Your AI</div><p class="soft">Base Camp runs on any model. Switch any time. Your memories stay yours.</p><div class="tiles2" role="radiogroup" aria-label="AI model">' + D.MODELS.map(function (m) {
-        return '<button type="button" class="tile-radio" role="radio" aria-checked="' + (state.model === m.id) + '" data-action="model" data-model="' + m.id + '"><b>' + m.id + '</b><span>' + m.by + '</span></button>';
+      '<div class="label">Your AIs</div><p class="soft">Base Camp runs on as many as you like. Your memories work with all of them.</p><div class="tiles2" role="group" aria-label="AI models">' + D.MODELS.map(function (m) {
+        return '<button type="button" class="tile-radio" role="checkbox" aria-checked="' + (state.models.indexOf(m.id) > -1) + '" data-action="model" data-model="' + m.id + '"><b>' + m.id + '</b><span>' + m.by + '</span></button>';
       }).join('') + '</div>' +
+      '<div class="label">Your photo</div><div class="row gap12 base">' + photoPick(56) + (state.photo ? '<button type="button" class="btn text" data-action="photo-remove">Remove</button>' : '') + '</div>' +
       '<div class="label">Your name</div><form class="row gap8" data-form="rename"><label class="sr" for="gear-name">Your first name</label><input id="gear-name" class="input grow" type="text" value="' + esc(state.name) + '" autocomplete="given-name"><button type="submit" class="btn ghost">Save</button></form>' +
       '<div class="label">Your summit</div><div class="row base gap8"><span class="stat">' + state.summit + ' h</span><span class="soft">a week, for ' + esc(state.why.toLowerCase()) + '</span></div><div class="chips">' + [-5, 5].map(function (d) { return '<button type="button" class="chipbtn" data-action="gear-summit" data-d="' + d + '">' + (d > 0 ? '+' : '') + d + ' h</button>'; }).join('') + '</div>' +
-      '<div class="label">Protected time</div><div class="chips" role="group" aria-label="Protected time">' + ['Friday afternoons', 'Mornings until 10', 'Evenings after 6'].map(function (p) {
-        return '<button type="button" class="chipbtn" aria-pressed="' + (state.protect === p) + '" data-action="protect" data-p="' + esc(p) + '">' + esc(p) + '</button>';
-      }).join('') + '</div>' +
       '<div class="label">Demo</div>' + (session.confirmReset ?
         '<p>Start over? This clears your name, summit, camps and trail log on this device.</p><div class="row gap8"><button type="button" class="btn primary" data-action="reset">Start over</button><button type="button" class="btn ghost" data-action="reset-cancel">Keep my climb</button></div>' :
         '<button type="button" class="btn ghost" data-action="reset-ask">Start over</button>');
@@ -476,7 +582,7 @@
       '<text font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="800" letter-spacing="2.5" fill="' + MIST + '"><textPath href="#award-arc" startOffset="50%" text-anchor="middle">AWARDED TO ' + esc(name.toUpperCase()) + '</textPath></text>' +
       '<image href="assets/icon-white.svg" x="124" y="62" width="32" height="35"/>' +
       '<text x="140" y="146" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="46" font-weight="900" letter-spacing="-2" fill="' + MIST + '">' + hours + ' H</text>' +
-      '<text x="140" y="164" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="10" font-weight="800" letter-spacing="2.5" fill="' + MIST + '">HOURS A WEEK</text>' +
+      '<text x="140" y="164" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="10" font-weight="800" letter-spacing="2.5" fill="' + MIST + '">SAVED A WEEK</text>' +
       '<polygon points="14,174 266,174 254,188 266,202 14,202 26,188" fill="' + MIST + '" stroke="' + PINE + '" stroke-width="1.5" stroke-linejoin="round"/>' +
       '<text x="140" y="193" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="14" font-weight="900" letter-spacing="3" fill="' + PINE + '">SUMMIT ' + ('0' + n).slice(-2) + '</text>' +
       '<text x="140" y="222" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="10" font-weight="700" letter-spacing="2.5" fill="' + MIST + '">' + monthTag() + '</text></svg>';
@@ -485,38 +591,142 @@
   function renderSummit(r) {
     var reached = elevation() >= state.summit;
     var hrs = state.summit, n = Math.max(1, state.summits + (reached && state.reached !== state.summit ? 1 : 0));
-    var opts = [[hrs + 5, 'The next ridge', 'Suggested'], [hrs + 10, 'The high pass', unexplored().length ? 'Needs new camps' : 'A long climb'], [hrs, 'Hold', 'Stay at ' + hrs]];
+    var opts = [[hrs + 5, 'The next ridge'], [hrs + 10, 'The high pass'], [hrs, 'Stay here']];
     if (!nextPick) nextPick = opts[0][0];
     var body = '<div class="summit-wrap">' + award(hrs, state.name, n) +
-      (reached ? '<h1>You made the summit</h1><p class="lede">' + hrs + ' hours a week, back for ' + esc(state.why.toLowerCase()) + '.</p>' +
+      (reached ? '<h1>You made the summit</h1><p class="lede">' + hrs + ' hours saved a week, for ' + esc(state.why.toLowerCase()) + '.</p>' +
         '<div class="label">Your next summit</div><div class="tiles3" role="radiogroup" aria-label="Next summit">' + opts.map(function (o, i) {
           var val = i === 2 ? 'hold' : o[0];
-          return '<button type="button" class="tile-radio" role="radio" aria-checked="' + (String(nextPick) === String(val)) + '" data-action="next-pick" data-v="' + val + '"><b>' + (i === 2 ? 'Hold' : o[0] + ' h') + '</b><span>' + o[1] + '</span><small>' + o[2] + '</small></button>';
+          return '<button type="button" class="tile-radio" role="radio" aria-checked="' + (String(nextPick) === String(val)) + '" data-action="next-pick" data-v="' + val + '"><b>' + (i === 2 ? 'Hold' : o[0] + ' h') + '</b><span>' + (i === 2 ? 'at ' + hrs + ' h saved' : 'saved a week') + '</span><small>' + o[1] + '</small></button>';
         }).join('') + '</div>' +
-        '<div class="row gap12 center"><button type="button" class="btn primary lg" data-action="next-set">' + (nextPick === 'hold' ? 'Hold at ' + hrs : 'Set ' + nextPick + ' hours') + '</button><button type="button" class="btn ghost lg" data-action="share">Share the award</button></div>'
-        : '<h1>Not there yet</h1><p class="lede">' + fh(toGo()) + ' hours to go. Hand Sherpa more trails or explore a new camp.</p><a href="#home" class="btn primary lg">Back to the climb</a>') +
+        '<div class="row gap12 center"><button type="button" class="btn primary lg" data-action="next-set">' + (nextPick === 'hold' ? 'Hold at ' + hrs + ' h' : 'Climb to ' + nextPick + ' h') + '</button><button type="button" class="btn ghost lg" data-action="share">Share the award</button></div>'
+        : '<h1>Not there yet</h1><p class="lede">' + (potential() < state.summit ? 'Your camps can save about ' + fh(potential()) + ' h a week. Hand Sherpa more trails or explore a new camp to reach ' + state.summit + '.' : fh(toGo()) + ' hours to go. Sherpa is on it.') + '</p><a href="#home" class="btn primary lg">Back to the climb</a>') +
       '</div>';
     if (desk()) return dHeader(r) + '<main class="d-page summit" id="main"><img class="tex" src="assets/texture-mist.svg" alt="">' + body + '</main>';
     return pHeader(r) + '<main class="p-main summit" id="main"><img class="tex" src="assets/texture-mist.svg" alt="">' + body + '</main>' + pTabs(r);
   }
 
-  /* ================= map ================= */
-  var GEO = {
-    land: {
-      img: 'assets/terrain.svg', w: 1440, h: 1000, crop: [92, 88, 827, 857],
-      pts: { trailhead: [120, 800], mail: [250, 650], chat: [470, 712], clients: [700, 600], money: [440, 500], base: [640, 410], summit: [560, 150], projects: [170, 420], support: [840, 720], sherpa: [577, 556] },
-      side: { mail: 'top', chat: 'bottom', clients: 'right', money: 'left', base: 'left', summit: 'left', projects: 'top', support: 'bottom' },
-      setup: 'M120 800 C125 792 137 767 150 752 C163 737 183 725 200 708 C217 691 230 653 250 650 C270 647 293 679 318 688 C343 697 373 700 398 704 C423 708 443 714 470 712 C497 710 533 704 560 694 C587 684 609 668 632 652 C655 636 701 614 700 600 C699 586 653 575 624 566 C595 557 559 559 528 548 C497 537 445 516 440 500 C435 484 474 461 496 452 C518 443 548 451 572 444 C596 437 616 425 640 410',
-      climb: 'M640 410 C664 395 704 374 716 356 C728 338 723 317 712 300 C701 283 668 270 650 254 C632 238 619 221 604 204 C589 187 567 159 560 150'
-    },
-    port: {
-      img: 'assets/terrain-portrait.svg', w: 350, h: 685, crop: [0, 0, 350, 685],
-      pts: { trailhead: [94, 649], mail: [249, 589], chat: [109, 519], clients: [269, 449], money: [89, 379], base: [219, 299], summit: [174, 69], projects: [304, 629], support: [299, 169], sherpa: [179, 408] },
-      side: { mail: 'top', chat: 'left', clients: 'bottom', money: 'left', base: 'left', summit: 'right', projects: 'left', support: 'bottom' },
-      setup: 'M95 650 C101 646 112 634 130 628 C148 622 180 621 200 615 C220 609 250 599 250 590 C250 581 218 568 200 560 C182 552 155 547 140 540 C125 533 105 529 110 520 C115 511 148 496 170 488 C192 480 223 476 240 470 C257 464 273 458 270 450 C267 442 242 428 220 420 C198 412 162 407 140 400 C118 393 92 389 90 380 C88 371 114 354 130 345 C146 336 170 332 185 325 C200 318 208 310 220 300',
-      climb: 'M220 300 C232 290 253 278 258 268 C263 258 258 247 250 238 C242 229 222 221 210 212 C201 205 189 201 183 193 C182 191 180 189 180 186 C178 174 198 154 200 140 C202 126 194 117 190 105 C186 93 178 76 175 70'
+  /* ================= the mountain ================= */
+  // Every mountain is generated from its number: the same layout each time you open it, a new one after
+  // every summit. The four core camps sit on the approach below Base Camp. Base Camp is the hub: every other
+  // camp is an outpost around and below it, on its own short trail. The summit route stays clear.
+  var MW = 3000, MH = 3000, worlds = {};
+  var MS = { 1: [['L', 'B']], 2: [['B', 'R']], 3: [['L', 'R']], 4: [['T', 'R']], 5: [['L', 'T'], ['B', 'R']], 6: [['T', 'B']], 7: [['L', 'T']],
+    8: [['L', 'T']], 9: [['T', 'B']], 10: [['T', 'R'], ['L', 'B']], 11: [['T', 'R']], 12: [['L', 'R']], 13: [['B', 'R']], 14: [['L', 'B']] };
+  // A smooth path through points (Catmull-Rom as cubic curves).
+  function curve(pts) {
+    var out = [];
+    for (var i = 0; i < pts.length - 1; i++) {
+      var p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
+      out.push('C' + r1(p1[0] + (p2[0] - p0[0]) / 6) + ' ' + r1(p1[1] + (p2[1] - p0[1]) / 6) + ' ' + r1(p2[0] - (p3[0] - p1[0]) / 6) + ' ' + r1(p2[1] - (p3[1] - p1[1]) / 6) + ' ' + r1(p2[0]) + ' ' + r1(p2[1]));
     }
-  };
+    return out;
+  }
+  // A point nudged sideways between each pair, so trails wind like real ones. Waypoint i ends up at index 2i.
+  function wind(pts, r, amt) {
+    var out = [pts[0]];
+    for (var i = 1; i < pts.length; i++) {
+      var a = pts[i - 1], b = pts[i], dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy) || 1, off = (r() - 0.5) * 2 * amt * Math.min(1, len / 300);
+      out.push([(a[0] + b[0]) / 2 - dy / len * off, (a[1] + b[1]) / 2 + dx / len * off], b);
+    }
+    return out;
+  }
+  function world(n) {
+    if (worlds[n]) return worlds[n];
+    var r = rng(seedOf('apex-mountain-' + n)), cx = MW / 2, side = r() < 0.5 ? -1 : 1;
+    var summit = [cx + (r() - 0.5) * 640, 250 + r() * 120];
+    var base = [cx + (r() - 0.5) * 360, 1880 + r() * 120];
+    var trailhead = [cx + side * (380 + r() * 200), MH - 170];
+    var pts = {}, sides = {}, core = D.CAMPS.filter(function (c) { return c.core; }), extra = D.CAMPS.filter(function (c) { return !c.core; });
+    // The approach: up from the trailhead through the four core camps to Base Camp.
+    var setupPts = [trailhead];
+    core.forEach(function (c, i) {
+      var t = (i + 1) / (core.length + 1), s = i % 2 ? side : -side;
+      pts[c.id] = [cx + s * (170 + r() * 230), trailhead[1] + (base[1] - trailhead[1]) * t + (r() - 0.5) * 40];
+      sides[c.id] = s < 0 ? 'left' : 'right';
+      setupPts.push(pts[c.id]);
+    });
+    setupPts.push(base);
+    var setupSegs = curve(wind(setupPts, r, 80));
+    // The summit route: long switchbacks from Base Camp to the top, with nothing else on it.
+    var climbPts = [base], legs = 6;
+    for (var i = 1; i < legs; i++) { var t = i / legs; climbPts.push([base[0] + (summit[0] - base[0]) * t + (i % 2 ? 1 : -1) * (210 + r() * 230) * (1 - t * 0.5), base[1] + (summit[1] - base[1]) * t]); }
+    climbPts.push(summit);
+    var climb = 'M' + r1(base[0]) + ' ' + r1(base[1]) + curve(wind(climbPts, r, 90)).join('');
+    // Outposts: every other camp sits on the flanks around and below Base Camp, each on its own trail out of
+    // Base Camp, so any one can be made without the others. Each side fans out top to bottom, staggered in and out.
+    var order = extra.slice();
+    for (i = order.length - 1; i > 0; i--) { var j0 = Math.floor(r() * (i + 1)), tmp = order[i]; order[i] = order[j0]; order[j0] = tmp; }
+    // Trails leave Base Camp sideways to an exit on each flank, then fan out to their outposts at evenly spaced
+    // angles, near and far in turn. Trails heading out at different angles never cross.
+    var first = r() < 0.5 ? -1 : 1, bySide = { '-1': [], '1': [] };
+    var exits = { '-1': [base[0] - 640, base[1] - 110], '1': [base[0] + 640, base[1] - 110] };
+    order.forEach(function (c, i) { bySide[i % 2 ? -first : first].push(c); });
+    [-1, 1].forEach(function (s) {
+      var list = bySide[s], ex = exits[s];
+      list.forEach(function (c, k) {
+        var a = (-35 + (list.length > 1 ? k / (list.length - 1) : 0.5) * 97) * Math.PI / 180, R = (k % 2 ? 880 : 540) + r() * 90;
+        pts[c.id] = [ex[0] + s * R * Math.cos(a), Math.min(ex[1] + R * Math.sin(a), MH - 240)];
+      });
+    });
+    // keep outposts apart from each other and from every camp
+    for (var it = 0; it < 8; it++) extra.forEach(function (a) {
+      D.CAMPS.forEach(function (b) {
+        if (a === b) return;
+        var p = pts[a.id], q = pts[b.id], dx = p[0] - q[0], dy = p[1] - q[1], d = Math.hypot(dx, dy);
+        if (d < 430 && d > 0) { var push = b.core ? 430 - d : (430 - d) / 2; p[0] = clamp(p[0] + dx / d * push, -800, MW + 800); p[1] = clamp(p[1] + dy / d * push, base[1] - 500, MH - 220); }
+      });
+    });
+    extra.forEach(function (c) { sides[c.id] = pts[c.id][0] < cx ? 'left' : 'right'; });
+    var spur = {};
+    // Outposts on the same side share the first stretch out of Base Camp, like a trunk with branches.
+    extra.forEach(function (c) {
+      var p = pts[c.id];
+      var ex = exits[p[0] < base[0] ? -1 : 1];
+      spur[c.id] = 'M' + r1(base[0]) + ' ' + r1(base[1]) + curve([base, [(base[0] + ex[0]) / 2, base[1] - 120], ex, [(ex[0] + p[0]) / 2, (ex[1] + p[1]) / 2 + (p[1] > ex[1] ? -40 : 40)], p]).join('');
+    });
+    var all = [trailhead, base, summit].concat(D.CAMPS.map(function (c) { return pts[c.id]; }));
+    var minX = Math.min.apply(null, all.map(function (p) { return p[0]; })) - 260, maxX = Math.max.apply(null, all.map(function (p) { return p[0]; })) + 260;
+    var crop = [minX, summit[1] - 240, maxX - minX, trailhead[1] + 150 - (summit[1] - 240)];
+
+    // The terrain: a height map with the summit as the highest point and a gentle hollow around Base Camp,
+    // drawn as contour lines that run well past the mountain on every side.
+    var peaks = [[summit[0], summit[1] + 160, 1, 900, 1750], [base[0], base[1] + 220, -0.1, 760, 420]];
+    for (i = 0; i < 14; i++) peaks.push([r() * MW, 300 + r() * (MH - 600), 0.15 + r() * 0.32, 180 + r() * 360, 180 + r() * 420]);
+    for (i = 0; i < 30; i++) { var ang = r() * Math.PI * 2, dist = 1900 + r() * 2900; peaks.push([MW / 2 + Math.cos(ang) * dist, MH / 2 + Math.sin(ang) * dist, 0.25 + r() * 0.4, 260 + r() * 420, 260 + r() * 460]); }
+    peaks.push([summit[0] - 620 - r() * 200, summit[1] + 700 + r() * 300, 0.45, 360, 620], [summit[0] + 620 + r() * 200, summit[1] + 820 + r() * 300, 0.4, 380, 600]);
+    var nz = r() * 1000;
+    function height(x, y) {
+      var h = 0.55 * (1 - clamp(y, -300, MH + 300) / MH) * Math.exp(-Math.pow(Math.max(0, Math.abs(x - MW / 2) - 2200) / 1600, 2));
+      for (var q = 0; q < peaks.length; q++) { var pk = peaks[q], dx = (x - pk[0]) / pk[3], dy = (y - pk[1]) / pk[4]; h += pk[2] * Math.exp(-(dx * dx + dy * dy)); }
+      return h + 0.035 * Math.sin(x * 0.006 + nz) * Math.cos(y * 0.005 - nz) + 0.02 * Math.sin(x * 0.015 + y * 0.011 + nz * 2);
+    }
+    var cell = 34, gx = -2700, gy = -2700, gw = Math.round((MW + 5400) / cell) + 1, gh = Math.round((MH + 5400) / cell) + 1, f = new Float32Array(gw * gh), lo = 1e9, hi = -1e9;
+    for (var j = 0; j < gh; j++) for (i = 0; i < gw; i++) { var v = height(gx + i * cell, gy + j * cell); f[j * gw + i] = v; if (v < lo) lo = v; if (v > hi) hi = v; }
+    var LV = 42, thin = [], thick = [];
+    for (var L = 1; L < LV; L++) {
+      var lv = lo + (hi - lo) * L / LV, out = L % 5 ? thin : thick;
+      for (j = 0; j < gh - 1; j++) for (i = 0; i < gw - 1; i++) {
+        var a = f[j * gw + i], b = f[j * gw + i + 1], c2 = f[(j + 1) * gw + i + 1], d = f[(j + 1) * gw + i];
+        var idx = (a > lv ? 8 : 0) | (b > lv ? 4 : 0) | (c2 > lv ? 2 : 0) | (d > lv ? 1 : 0);
+        if (!idx || idx === 15) continue;
+        var x0 = gx + i * cell, yy = gy + j * cell, E = {};
+        MS[idx].forEach(function (seg) {
+          seg.forEach(function (e) {
+            if (E[e]) return;
+            E[e] = e === 'T' ? [x0 + cell * (lv - a) / (b - a), yy] : e === 'R' ? [x0 + cell, yy + cell * (lv - b) / (c2 - b)] : e === 'B' ? [x0 + cell * (lv - d) / (c2 - d), yy + cell] : [x0, yy + cell * (lv - a) / (d - a)];
+          });
+          out.push('M' + Math.round(E[seg[0]][0]) + ' ' + Math.round(E[seg[0]][1]) + 'L' + Math.round(E[seg[1]][0]) + ' ' + Math.round(E[seg[1]][1]));
+        });
+      }
+    }
+    var terrain = '<rect x="-6000" y="-6000" width="' + (MW + 12000) + '" height="' + (MH + 12000) + '" fill="' + MIST + '"/>' +
+      '<path d="' + thin.join('') + '" fill="none" stroke="' + PINE + '" stroke-opacity="0.13" stroke-width="1" vector-effect="non-scaling-stroke"/>' +
+      '<path d="' + thick.join('') + '" fill="none" stroke="' + PINE + '" stroke-opacity="0.26" stroke-width="1.2" vector-effect="non-scaling-stroke"/>';
+    worlds[n] = { n: n, pts: pts, sides: sides, trailhead: trailhead, base: base, summit: summit, setupPts: setupPts, setupSegs: setupSegs, climb: climb, spur: spur, crop: crop, terrain: terrain };
+    return worlds[n];
+  }
+
   var measure = null;
   function pathTool(d) {
     if (!measure) {
@@ -527,7 +737,8 @@
       holder.appendChild(measure); document.body.appendChild(holder);
     }
     measure.setAttribute('d', d);
-    return { len: measure.getTotalLength(), at: function (l) { var p = measure.getPointAtLength(l); return [p.x, p.y]; } };
+    var len = measure.getTotalLength();
+    return { len: len, at: function (l) { measure.setAttribute('d', d); var p = measure.getPointAtLength(l); return [p.x, p.y]; } };
   }
   function halo(x, y, txt, k, o) {
     o = o || {};
@@ -543,206 +754,359 @@
     lines.forEach(function (l, i) { out += halo(x, y0 + i * lh, l.t, k, { anchor: anchor, size: l.size || 12, weight: l.w || 800, opacity: l.o, ls: l.ls }); });
     return out;
   }
-  function focusBox(g, id, W, H) {
-    var p = typeof id === 'string' ? g.pts[id] : id, vw = g === GEO.land ? 520 : 280, vh = vw * H / W;
-    if (vh > g.h) { vh = g.h; vw = vh * W / H; }
-    var x = clamp(p[0] - vw / 2, 0, g.w - vw), y = clamp(p[1] - vh / 2, 0, g.h - vh);
-    return [r1(x), r1(y), r1(vw), r1(vh)];
+  // The visible part of the map, kept to the frame's shape, between a close-up and the whole mountain.
+  // The land you can move around in: the mountain plus wide country on every side.
+  var MAPBOX = { x: -2400, y: -2400, w: MW + 4800, h: MH + 4800 };
+  function fitVB(vb, W, H) { var a = W / H, w = vb[2], h = vb[3], cx = vb[0] + w / 2, cy = vb[1] + h / 2; if (w / h > a) h = w / a; else w = h * a; return [cx - w / 2, cy - h / 2, w, h]; }
+  function clampVB(vb, g, W, H) {
+    var a = W / H, cx = vb[0] + vb[2] / 2, cy = vb[1] + vb[3] / 2;
+    var gx = g.x || 0, gy = g.y || 0, maxW = Math.min(g.w, g.h * a), w = clamp(vb[2], Math.min(maxW, 320), maxW), h = w / a;
+    var x = w >= g.w ? gx + (g.w - w) / 2 : clamp(cx - w / 2, gx, gx + g.w - w);
+    var y = h >= g.h ? gy + (g.h - h) / 2 : clamp(cy - h / 2, gy, gy + g.h - h);
+    return [x, y, w, h];
   }
+  function focusOn(p, W, H, vw) { vw = vw || 900; var vh = vw * H / W; return [p[0] - vw / 2, p[1] - vh / 2, vw, vh]; }
   function drawMap(host, opts) {
     var W = host.clientWidth, H = host.clientHeight; if (!W || !H) return;
-    var g = H / W > 1.15 || W < 480 ? GEO.port : GEO.land;
-    var onb = !state.onboarded, e = elevation(), s = [];
-    var ct = pathTool(g.climb), frac = onb ? 0 : clamp(e / state.summit, 0, 1);
-    var you = onb ? g.pts.trailhead : (frac > 0 ? ct.at(ct.len * frac) : g.pts.base);
-    var vb = opts.focus ? focusBox(g, opts.focus, W, H) : opts.center === 'you' ? focusBox(g, you, W, H) : g.crop;
-    var k = 1 / Math.max(W / vb[2], H / vb[3]);
-    s.push('<svg class="map-svg" xmlns="http://www.w3.org/2000/svg" viewBox="' + vb.join(' ') + '" preserveAspectRatio="xMidYMid slice" width="' + W + '" height="' + H + '">');
-    s.push('<image href="' + g.img + '" x="0" y="0" width="' + g.w + '" height="' + g.h + '" preserveAspectRatio="none"/>');
-    var dim = function (id) { return opts.focus && opts.focus !== id ? ' opacity="0.3"' : ''; };
-    // the setup trail
-    s.push('<path d="' + g.setup + '" fill="none" stroke="' + PINE + '"' + (onb ? ' stroke-opacity="0.55" stroke-width="' + r1(2.5 * k) + '" stroke-dasharray="0 ' + r1(8 * k) + '"' : ' stroke-width="' + r1(3.5 * k) + '"') + ' stroke-linecap="round" stroke-linejoin="round"' + (opts.focus ? ' opacity="0.45"' : '') + '/>');
+    var w = world(state.mapN || 1), pre = !climbing(), e = elevation(), made = coreMade(), still = !!opts.still;
+    var ct = pathTool(w.climb), frac = pre ? 0 : clamp(e / state.summit, 0, 1);
+    var you = still ? w.trailhead : pre ? w.setupPts[made] : (frac > 0 ? ct.at(ct.len * frac) : w.base);
+    var vb;
+    if (opts.live) {
+      var key = (opts.key || 'home') + '-' + w.n;
+      // Full screen shows the whole mountain; everywhere else opens close in on you, like a game camera.
+      var base = clampVB(fitVB(opts.key === 'full' ? w.crop : focusOn(you, W, H, opts.key === 'pv' ? 900 : 1150), W, H), MAPBOX, W, H);
+      vb = session.mapVB[key] ? clampVB(session.mapVB[key], MAPBOX, W, H) : base;
+      session.mapVB[key] = vb;
+      host._map = { key: key, g: MAPBOX, base: base, opts: opts };
+    } else {
+      vb = clampVB(fitVB(w.crop, W, H), MAPBOX, W, H);
+      host._map = null;
+    }
+    // Zoomed far out, markers shrink a little and the estimates hide, so the whole mountain stays readable.
+    var zf = clamp(vb[2] / 1300, 1, 6), dense = zf > 1.6, far = zf > 2.7;
+    var k = 1 / Math.max(W / vb[2], H / vb[3]) * (still ? 0.55 : 1 / Math.sqrt(zf)), vbs = vb.map(r1).join(' ');
+    // The contours are drawn once per mountain and kept; moving around only changes what part is in view.
+    var ter = $('svg.map-terrain', host);
+    if (!ter || ter.getAttribute('data-n') !== String(w.n)) {
+      host.innerHTML = '<svg class="map-terrain" data-n="' + w.n + '" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice" aria-hidden="true">' + w.terrain + '</svg><div class="map-over"></div>';
+      ter = $('svg.map-terrain', host);
+    }
+    ter.setAttribute('viewBox', vbs); ter.setAttribute('width', W); ter.setAttribute('height', H);
+    function mk(action, extra, label) { return still ? '<g aria-hidden="true">' : '<g class="mk" data-action="' + action + '"' + (extra || '') + ' role="button" tabindex="0" aria-label="' + esc(label) + '">'; }
+    var s = ['<svg class="map-svg" xmlns="http://www.w3.org/2000/svg" viewBox="' + vbs + '" preserveAspectRatio="xMidYMid slice" width="' + W + '" height="' + H + '">'];
+    if (state.photo) s.push('<defs><clipPath id="you-clip"><circle cx="' + r1(you[0]) + '" cy="' + r1(you[1]) + '" r="' + r1(19 * k) + '"/></clipPath></defs>');
+    var dotted = ' stroke-opacity="0.55" stroke-width="' + r1(2.5 * k) + '" stroke-dasharray="0 ' + r1(8 * k) + '"', solid = ' stroke-width="' + r1(3.5 * k) + '"', ends = ' stroke-linecap="round" stroke-linejoin="round"';
+    var setup = 'M' + r1(w.trailhead[0]) + ' ' + r1(w.trailhead[1]) + w.setupSegs.join('');
+    // the trail to Base Camp: solid as far as you've made camp
+    s.push('<path d="' + setup + '" fill="none" stroke="' + PINE + '"' + (pre || still ? dotted : solid) + ends + '/>');
+    if (pre && made && !still) s.push('<path d="M' + r1(w.trailhead[0]) + ' ' + r1(w.trailhead[1]) + w.setupSegs.slice(0, made * 2).join('') + '" fill="none" stroke="' + PINE + '"' + solid + ends + '/>');
+    // branch trails out to the camps past Base Camp
+    D.CAMPS.forEach(function (c) { if (w.spur[c.id]) s.push('<path d="' + w.spur[c.id] + '" fill="none" stroke="' + PINE + '"' + (isOn(c.id) && !still ? solid : dotted) + ends + '/>'); });
     // the climb: dotted ahead, solid walked
-    s.push('<path d="' + g.climb + '" fill="none" stroke="' + PINE + '" stroke-width="' + r1(2.5 * k) + '" stroke-dasharray="0 ' + r1(8 * k) + '" stroke-linecap="round"' + (opts.focus ? ' opacity="0.45"' : '') + '/>');
-    if (frac > 0) s.push('<path d="' + g.climb + '" fill="none" stroke="' + PINE + '" stroke-width="' + r1(3.5 * k) + '" stroke-dasharray="' + r1(ct.len * frac) + ' ' + r1(ct.len * 2) + '" stroke-linecap="round"' + (opts.focus ? ' opacity="0.45"' : '') + '/>');
-    // waypoints
-    if (!opts.focus) [0.25, 0.5, 0.75].forEach(function (f) {
-      var p = ct.at(ct.len * f);
+    s.push('<path d="' + w.climb + '" fill="none" stroke="' + PINE + '"' + dotted + ends + '/>');
+    if (frac > 0) s.push('<path d="' + w.climb + '" fill="none" stroke="' + PINE + '" stroke-width="' + r1(3.5 * k) + '" stroke-dasharray="' + r1(ct.len * frac) + ' ' + r1(ct.len * 2) + '"' + ends + '/>');
+    // hour markers on the climb
+    if (!still) [0.25, 0.5, 0.75].forEach(function (fq) {
+      var p = ct.at(ct.len * fq);
       s.push('<circle cx="' + r1(p[0]) + '" cy="' + r1(p[1]) + '" r="' + r1(5 * k) + '" fill="' + MIST + '" stroke="' + PINE + '" stroke-width="' + r1(2 * k) + '"/>');
-      if (onb || Math.abs(f - frac) > 0.1) s.push(halo(p[0] + 10 * k, p[1] + 4 * k, fh(state.summit * f) + ' h', k, { anchor: 'start', size: 12, weight: 700, ls: 0 }));
+      if (pre || Math.abs(fq - frac) > 0.08) s.push(halo(p[0] + 10 * k, p[1] + 4 * k, fh(state.summit * fq) + ' h', k, { anchor: 'start', size: 12, weight: 700, ls: 0 }));
     });
     // trailhead
-    var th = g.pts.trailhead;
-    s.push('<g' + dim('x') + ' class="mk" data-action="toast" data-msg="The trailhead. Where your climb started." role="button" tabindex="0" aria-label="Trailhead"><circle cx="' + th[0] + '" cy="' + th[1] + '" r="' + r1(18 * k) + '" fill="' + MIST + '" stroke="' + PINE + '" stroke-width="' + r1(2 * k) + '"/>' + iconAt('trailhead', th, 18 * k, PINE) + '</g>');
+    var th = w.trailhead;
+    s.push(mk('toast', ' data-msg="The trailhead. Where your climb started."', 'Trailhead') + '<circle cx="' + r1(th[0]) + '" cy="' + r1(th[1]) + '" r="' + r1(18 * k) + '" fill="' + MIST + '" stroke="' + PINE + '" stroke-width="' + r1(2 * k) + '"/>' + iconAt('trailhead', th, 18 * k, PINE) +
+      labelAt(th, th[0] < MW / 2 ? 'left' : 'right', 18, k, [{ t: 'TRAILHEAD', size: 11 }]) + '</g>');
     // camps
     D.CAMPS.forEach(function (c) {
-      var p = g.pts[c.id], on = isOn(c.id), big = opts.focus === c.id;
-      var rpx = big ? 30 : c.core ? 24 : 21, rr = rpx * k;
-      var action = onb ? (c.core ? 'row' : 'toast') : on ? 'open-camp' : 'explore';
-      var lines = [{ t: c.name.toUpperCase() }];
-      if (big) { lines = [{ t: c.name.toUpperCase(), size: 15 }, { t: 'LEVEL ' + level(c) + ' · ' + c.memories.toLocaleString('en-US') + ' MEMORIES', size: 11, w: 700 }, { t: '+' + f1(campHours(c.id)) + ' H A WEEK', size: 11, w: 700 }]; }
-      else if (!on) lines.push({ t: '+' + fh(c.hours) + ' H', size: 11, w: 600, o: 0.72 });
-      s.push('<g class="mk" data-action="' + action + '" data-camp="' + c.id + '" data-msg="Projects and Support open up after Base Camp." role="button" tabindex="0" aria-label="' + esc(c.name) + (on ? ' camp' : ', not connected') + '"' + dim(c.id) + '>' +
-        (big ? '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="' + r1(rr + 9 * k) + '" fill="none" stroke="' + PINE + '" stroke-opacity="0.72" stroke-width="' + r1(1 * k) + '"/>' : '') +
-        '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="' + r1(rr) + '" fill="' + MIST + '" stroke="' + PINE + '"' + (on ? '' : ' stroke-opacity="0.72" stroke-dasharray="' + r1(4 * k) + ' ' + r1(4 * k) + '"') + ' stroke-width="' + r1(2 * k) + '"/>' +
-        iconAt(c.icon, p, (big ? 26 : 22) * k, on ? PINE : 'rgba(28,58,40,0.72)') +
-        labelAt(p, g.side[c.id], rpx, k, lines) + '</g>');
+      var p = w.pts[c.id], on = isOn(c.id) && !still, rpx = c.core ? 24 : 22, lines = [{ t: c.name.toUpperCase() }];
+      if (!on && !dense) lines.push({ t: '+' + fh(c.hours) + ' H', size: 11, w: 600, o: 0.72 });
+      s.push(mk(on ? 'open-camp' : 'explore', ' data-camp="' + c.id + '"', c.name + (on ? ' camp' : ', not connected')) +
+        '<circle cx="' + r1(p[0]) + '" cy="' + r1(p[1]) + '" r="' + r1(rpx * k) + '" fill="' + MIST + '" stroke="' + PINE + '"' + (on ? '' : ' stroke-opacity="0.72" stroke-dasharray="' + r1(4 * k) + ' ' + r1(4 * k) + '"') + ' stroke-width="' + r1(2 * k) + '"/>' +
+        iconAt(c.icon, p, 22 * k, on ? PINE : 'rgba(28,58,40,0.72)') + (still || far ? '' : labelAt(p, w.sides[c.id], rpx, k, lines)) + '</g>');
     });
     // base camp
-    var b = g.pts.base;
-    s.push('<g class="mk" data-action="' + (onb ? 'toast' : 'go') + '" data-to="gear" data-msg="Base Camp is where you pick your AI. Last step." role="button" tabindex="0" aria-label="Base Camp, ' + esc(state.model) + '"' + dim('base') + '><circle cx="' + b[0] + '" cy="' + b[1] + '" r="' + r1(24 * k) + '" fill="' + MIST + '" stroke="' + PINE + '"' + (onb ? ' stroke-dasharray="' + r1(4 * k) + ' ' + r1(4 * k) + '" stroke-opacity="0.72"' : '') + ' stroke-width="' + r1(2 * k) + '"/>' + iconAt('base', b, 22 * k, PINE) +
-      labelAt(b, g.side.base, 24, k, onb ? [{ t: 'BASE CAMP' }] : [{ t: 'BASE CAMP' }, { t: state.model.toUpperCase(), size: 11, w: 600, o: 0.72 }]) + '</g>');
-    // summit
-    var sm = g.pts.summit;
-    s.push('<g class="mk" data-action="summit" role="button" tabindex="0" aria-label="Summit, ' + state.summit + ' hours a week"' + dim('summit') + '><circle cx="' + sm[0] + '" cy="' + sm[1] + '" r="' + r1(24 * k) + '" fill="' + (e >= state.summit && !onb ? PINE : MIST) + '" stroke="' + PINE + '" stroke-dasharray="' + (e >= state.summit && !onb ? '0' : r1(4 * k) + ' ' + r1(4 * k)) + '" stroke-width="' + r1(2 * k) + '"/>' + iconAt('flag', sm, 22 * k, e >= state.summit && !onb ? MIST : PINE) +
-      labelAt(sm, g.side.summit, 24, k, [{ t: 'SUMMIT · ' + state.summit + ' H', size: 13 }, { t: state.why.toUpperCase(), size: 11, w: 600, o: 0.72 }]) + '</g>');
-    // the climber
-    if (!onb) {
-      var yr = 19 * k, img = 18 * k, txt = f1(e) + ' h', pw = (44 + txt.length * 10) * k, ph = 32 * k;
-      var fitsR = you[0] + yr + 8 * k + pw < vb[0] + vb[2] - 8 * k, fitsL = you[0] - yr - 8 * k - pw > vb[0] + 8 * k;
-      var right = g === GEO.port ? !fitsL : fitsR, px = right ? you[0] + yr + 8 * k : you[0] - yr - 8 * k - pw, py = you[1] - ph / 2;
-      s.push('<g class="mk" data-action="go" data-to="log" role="button" tabindex="0" aria-label="You, ' + f1(e) + ' hours a week"' + dim('you') + '>' +
+    var b = w.base;
+    s.push(mk(pre ? 'basecamp' : 'go', ' data-to="gear"', 'Base Camp' + (pre ? ', not made yet' : ', ' + modelsLabel())) + '<circle cx="' + r1(b[0]) + '" cy="' + r1(b[1]) + '" r="' + r1(24 * k) + '" fill="' + MIST + '" stroke="' + PINE + '"' + (pre || still ? ' stroke-dasharray="' + r1(4 * k) + ' ' + r1(4 * k) + '" stroke-opacity="0.72"' : '') + ' stroke-width="' + r1(2 * k) + '"/>' + iconAt('base', b, 22 * k, PINE) +
+      labelAt(b, b[0] < MW / 2 ? 'left' : 'right', 24, k, pre || still ? [{ t: 'BASE CAMP' }] : [{ t: 'BASE CAMP' }, { t: modelsLabel().toUpperCase(), size: 11, w: 600, o: 0.72 }]) + '</g>');
+    // summit: the Apex mark
+    var sm = w.summit, top = !pre && !still && e >= state.summit;
+    s.push(mk('summit', '', 'Summit, ' + state.summit + ' hours a week') + '<circle cx="' + r1(sm[0]) + '" cy="' + r1(sm[1]) + '" r="' + r1(26 * k) + '" fill="' + (top ? PINE : MIST) + '" stroke="' + PINE + '" stroke-dasharray="' + (top ? '0' : r1(4 * k) + ' ' + r1(4 * k)) + '" stroke-width="' + r1(2 * k) + '"/>' +
+      '<image href="assets/' + (top ? 'icon-white.svg' : 'icon.svg') + '" x="' + r1(sm[0] - 11 * k) + '" y="' + r1(sm[1] - 12.5 * k) + '" width="' + r1(22 * k) + '" height="' + r1(23.8 * k) + '"/>' +
+      labelAt(sm, sm[0] < MW / 2 ? 'right' : 'left', 26, k, [{ t: 'SUMMIT · ' + state.summit + ' H', size: 13 }, { t: state.why.toUpperCase() + ((state.mapN || 1) > 1 ? ' · MOUNTAIN ' + state.mapN : ''), size: 11, w: 600, o: 0.72 }]) + '</g>');
+    // you
+    if (!still) {
+      var yr = 19 * k, txt = f1(e) + ' h', pw = (22 + txt.length * 9.6) * k, ph = 32 * k;
+      var fitsR = you[0] + yr + 8 * k + pw < vb[0] + vb[2] - 8 * k, px = fitsR ? you[0] + yr + 8 * k : you[0] - yr - 8 * k - pw, py = you[1] - ph / 2;
+      s.push('<g class="mk" data-action="go" data-to="log" role="button" tabindex="0" aria-label="You, ' + f1(e) + ' hours saved this week">' +
         '<circle cx="' + r1(you[0]) + '" cy="' + r1(you[1]) + '" r="' + r1(yr) + '" fill="' + MIST + '" stroke="' + PINE + '" stroke-width="' + r1(2 * k) + '"/>' +
-        '<image href="assets/climber.svg" x="' + r1(you[0] - img / 2) + '" y="' + r1(you[1] - img / 2 - 1 * k) + '" width="' + r1(img) + '" height="' + r1(img * 1.09) + '"/>' +
+        (state.photo ? '<image href="' + state.photo + '" x="' + r1(you[0] - 19 * k) + '" y="' + r1(you[1] - 19 * k) + '" width="' + r1(38 * k) + '" height="' + r1(38 * k) + '" preserveAspectRatio="xMidYMid slice" clip-path="url(#you-clip)"/><circle cx="' + r1(you[0]) + '" cy="' + r1(you[1]) + '" r="' + r1(19 * k) + '" fill="none" stroke="' + PINE + '" stroke-width="' + r1(2 * k) + '"/>'
+          : '<image href="assets/climber.svg" x="' + r1(you[0] - 9 * k) + '" y="' + r1(you[1] - 10 * k) + '" width="' + r1(18 * k) + '" height="' + r1(19.6 * k) + '"/>') +
         '<rect x="' + r1(px) + '" y="' + r1(py) + '" width="' + r1(pw) + '" height="' + r1(ph) + '" rx="' + r1(ph / 2) + '" fill="' + PINE + '"/>' +
-        '<text x="' + r1(px + 12 * k) + '" y="' + r1(py + ph / 2 + 4 * k) + '" font-size="' + r1(10.5 * k) + '" font-weight="700" letter-spacing="' + r1(0.7 * k) + '" fill="' + MIST + '" fill-opacity="0.72">YOU</text>' +
-        '<text x="' + r1(px + 40 * k) + '" y="' + r1(py + ph / 2 + 5.5 * k) + '" font-size="' + r1(16 * k) + '" font-weight="800" fill="' + MIST + '">' + txt + '</text></g>');
-      // Sherpa, out working
-      var sp = g.pts.sherpa;
-      s.push('<g class="mk" data-action="toast" data-msg="Sherpa is in Clients, filing call notes." role="button" tabindex="0" aria-label="Sherpa"' + dim('sherpa') + '><circle cx="' + sp[0] + '" cy="' + sp[1] + '" r="' + r1(16 * k) + '" fill="' + PINE + '" stroke="' + MIST + '" stroke-width="' + r1(2 * k) + '"/>' +
-        '<image href="assets/icon-white.svg" x="' + r1(sp[0] - 8 * k) + '" y="' + r1(sp[1] - 9 * k) + '" width="' + r1(16 * k) + '" height="' + r1(17 * k) + '"/></g>');
+        '<text x="' + r1(px + pw / 2) + '" y="' + r1(py + ph / 2 + 5.5 * k) + '" text-anchor="middle" font-size="' + r1(16 * k) + '" font-weight="800" fill="' + MIST + '">' + txt + '</text></g>');
     }
     s.push('</svg>');
-    host.innerHTML = s.join('');
-    host.setAttribute('role', 'img');
-    host.setAttribute('aria-label', opts.focus ? camp(opts.focus).name + ' on the mountain map.' : 'Mountain map. ' + (onb ? 'Setting up.' : 'You are at ' + f1(e) + ' hours a week of a ' + state.summit + ' hour summit.'));
+    $('.map-over', host).innerHTML = s.join('');
+    host.setAttribute('role', 'group');
+    host.setAttribute('aria-label', 'Mountain map. ' + (still ? 'Your route.' : pre ? 'At the trailhead. Base Camp is next.' : 'You have saved ' + f1(e) + ' hours this week of a ' + state.summit + ' hour summit.') + (opts.live ? ' Drag to move around, pinch or scroll to zoom.' : ''));
   }
   function iconAt(name, p, size, color) {
     var sc = size / 24;
     return '<g transform="translate(' + r1(p[0] - size / 2) + ' ' + r1(p[1] - size / 2) + ') scale(' + (Math.round(sc * 1000) / 1000) + ')" fill="none" stroke="' + color + '" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + ICON[name] + '</g>';
   }
 
-  /* ================= brain ================= */
+  /* ================= brain, in 3D ================= */
+  // Every camp's memory is a cluster of nodes around Sherpa. Inside a camp, the clusters are the kinds of
+  // things it remembers, and the named memories are tied together. Drag to turn it, pinch or scroll to zoom.
   function rng(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; var t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
   function seedOf(s) { var h = 2166136261; for (var i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return h >>> 0; }
   function gauss(r) { var u = r() || 1e-9, v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
-  function makeCluster(r, cx, cy, n, sigma) {
+  function d3(a, b) { return (a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y) + (a.z - b.z) * (a.z - b.z); }
+  // Points spread evenly over a sphere.
+  // On a tall screen the sphere stretches upward, so the brain uses the height it's given.
+  function sphere(n, turn, tall) {
+    var out = [], ga = Math.PI * (3 - Math.sqrt(5)), ys = tall ? 1.45 : 0.9;
+    for (var i = 0; i < n; i++) { var y = 1 - (i + 0.5) / n * 2, rr = Math.sqrt(1 - y * y), th = ga * i + turn; out.push([Math.cos(th) * rr, y * ys, Math.sin(th) * rr]); }
+    return out;
+  }
+  // A cloud of nodes, each tied to its two nearest neighbours.
+  function blob(r, c, n, sigma) {
     var nodes = [];
-    for (var i = 0; i < n; i++) nodes.push({ x: cx + gauss(r) * sigma, y: cy + gauss(r) * sigma * 0.85, z: r() });
+    for (var i = 0; i < n; i++) nodes.push({ x: c[0] + gauss(r) * sigma, y: c[1] + gauss(r) * sigma * 0.9, z: c[2] + gauss(r) * sigma, s: r() });
     var edges = [];
     nodes.forEach(function (a, i) {
-      var d = nodes.map(function (b, j) { return [j, (a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y)]; }).filter(function (q) { return q[0] !== i; }).sort(function (p, q) { return p[1] - q[1]; });
+      var d = nodes.map(function (b, j) { return [j, d3(a, b)]; }).filter(function (q) { return q[0] !== i; }).sort(function (p, q) { return p[1] - q[1]; });
       for (var m = 0; m < Math.min(2, d.length); m++) if (d[m][0] > i || m === 0) edges.push([i, d[m][0]]);
     });
     return { nodes: nodes, edges: edges };
   }
   var brainCache = {};
-  function shape(key, n, sigma) {
-    if (brainCache['s-' + key]) return brainCache['s-' + key];
-    var g = makeCluster(rng(seedOf(key)), 0, 0, n, sigma);
-    brainCache['s-' + key] = g; return g;
+  function scene(campId, tall) {
+    var key = (campId || 'whole') + (tall ? 'T' : ''); if (brainCache[key]) return brainCache[key];
+    var out;
+    if (!campId) {
+      var dirs = sphere(D.CAMPS.length, 0.5, tall);
+      out = { R: 330, E: 345, hubs: D.CAMPS.map(function (c, i) {
+        var p = dirs[i].map(function (v) { return v * 245; }), n = clamp(Math.round(Math.sqrt(c.memories) * 1.6), 18, 80);
+        var b = blob(rng(seedOf('w-' + c.id)), p, n, 18 + Math.sqrt(n) * 3.2);
+        return { camp: c, x: p[0], y: p[1], z: p[2], nodes: b.nodes, edges: b.edges, r: 40 + Math.sqrt(n) * 4 };
+      }) };
+    } else {
+      var c = camp(campId), gd = sphere(c.groups.length, 1.1, tall);
+      var hubs = c.groups.map(function (g, i) {
+        var p = gd[i].map(function (v) { return v * 205; }), n = clamp(Math.round(Math.sqrt(g[1]) * 2.6), 10, 48);
+        var b = blob(rng(seedOf('g-' + c.id + '-' + i)), p, n, 14 + Math.sqrt(n) * 3);
+        return { group: g, x: p[0], y: p[1], z: p[2], nodes: b.nodes, edges: b.edges, r: 32 + Math.sqrt(n) * 3.5 };
+      });
+      var named = c.named.map(function (m) {
+        var h = hubs[m[1]], t = { x: h.x * 0.82, y: h.y * 0.82, z: h.z * 0.82 };
+        return { name: m[0], group: h.group[0], n: h.nodes.slice().sort(function (p, q) { return d3(p, t) - d3(q, t); })[0] };
+      });
+      out = { R: 280, E: 285, hubs: hubs, named: named };
+    }
+    brainCache[key] = out; return out;
   }
-  function place(sh, cx, cy) { return sh.nodes.map(function (p) { return { x: cx + p.x, y: cy + p.y, z: p.z }; }); }
-  function wholeLayout(portrait) {
-    var key = 'whole' + (portrait ? 'P' : 'L');
-    if (brainCache[key]) return brainCache[key];
-    var Rx = portrait ? 190 : 300, Ry = portrait ? 330 : 258;
-    var cl = D.CAMPS.map(function (c, i) {
-      var a = (-90 + i * 60) * Math.PI / 180, cx = Math.cos(a) * Rx, cy = Math.sin(a) * Ry;
-      var n = clamp(Math.round(Math.sqrt(c.memories) * 1.6), 18, 80);
-      var sh = shape('w-' + c.id, n, 24 + Math.sqrt(n) * 4.2);
-      return { camp: c, cx: cx, cy: cy, a: a, nodes: place(sh, cx, cy), edges: sh.edges };
-    });
-    brainCache[key] = cl; return cl;
-  }
-  function campLayout(c, portrait) {
-    var key = 'c-' + c.id + (portrait ? 'P' : 'L');
-    if (brainCache[key]) return brainCache[key];
-    var Rx = portrait ? 165 : 240, Ry = portrait ? 290 : 205, gs = c.groups.length;
-    var groups = c.groups.map(function (g, i) {
-      var a = (-90 + i * 360 / gs) * Math.PI / 180, cx = Math.cos(a) * Rx, cy = Math.sin(a) * Ry;
-      var n = clamp(Math.round(Math.sqrt(g[1]) * 2.6), 10, 48);
-      var sh = shape('g-' + c.id + '-' + i, n, 18 + Math.sqrt(n) * 3.6);
-      return { name: g[0], count: g[1], cx: cx, cy: cy, a: a, nodes: place(sh, cx, cy), edges: sh.edges };
-    });
-    var named = c.named.map(function (m) {
-      var g = groups[m[1]], tx = g.cx - Math.cos(g.a) * 30, ty = g.cy - Math.sin(g.a) * 30;
-      var best = g.nodes.slice().sort(function (p, q) { return Math.hypot(p.x - tx, p.y - ty) - Math.hypot(q.x - tx, q.y - ty); })[0];
-      return { name: m[0], group: g.name, x: best.x, y: best.y };
-    });
-    brainCache[key] = { groups: groups, named: named }; return brainCache[key];
-  }
-  function nodesSvg(nodes, edges, k, op) {
-    var s = '';
-    edges.forEach(function (e) { var a = nodes[e[0]], b = nodes[e[1]]; s += '<line x1="' + r1(a.x) + '" y1="' + r1(a.y) + '" x2="' + r1(b.x) + '" y2="' + r1(b.y) + '"/>'; });
-    var g = '<g stroke="' + PINE + '" stroke-opacity="' + (0.2 * op) + '" stroke-width="' + r1(1 * k) + '">' + s + '</g><g fill="' + PINE + '">';
-    nodes.forEach(function (n) { g += '<circle cx="' + r1(n.x) + '" cy="' + r1(n.y) + '" r="' + r1((1.6 + n.z * 2.6) * k) + '" fill-opacity="' + r1((0.3 + n.z * 0.6) * op * 100) / 100 + '"/>'; });
-    return g + '</g>';
-  }
+  function pine(a) { return 'rgba(28,58,40,' + Math.round(a * 100) / 100 + ')'; }
+
   function drawBrain(host, opts) {
     var W = host.clientWidth, H = host.clientHeight; if (!W || !H) return;
-    var s = [], vb, k, portrait = H / W > 1.15 || W < 480;
-    if (!opts.camp) {
-      vb = portrait ? [-330, -490, 660, 980] : [-480, -430, 960, 860]; k = 1 / Math.min(W / vb[2], H / vb[3]);
-      s.push('<svg class="brain-svg" xmlns="http://www.w3.org/2000/svg" viewBox="' + vb.join(' ') + '" preserveAspectRatio="xMidYMid meet" width="' + W + '" height="' + H + '">');
-      var cl = wholeLayout(portrait), off = portrait ? 100 : 120;
-      cl.forEach(function (c) { if (isOn(c.camp.id)) s.push('<line x1="0" y1="0" x2="' + r1(c.cx) + '" y2="' + r1(c.cy) + '" stroke="' + PINE + '" stroke-opacity="0.45" stroke-width="' + r1(1.5 * k) + '"/>'); });
-      cl.forEach(function (c) {
-        var on = isOn(c.camp.id), lx = c.cx + Math.cos(c.a) * off, ly = c.cy + Math.sin(c.a) * (off - 10);
-        if (on) {
-          s.push('<g class="mk" data-action="open-camp" data-camp="' + c.camp.id + '" role="button" tabindex="0" aria-label="' + esc(c.camp.name) + ' camp, ' + c.camp.memories + ' memories">' +
-            '<circle cx="' + r1(c.cx) + '" cy="' + r1(c.cy) + '" r="115" fill="' + MIST + '" fill-opacity="0"/>' + nodesSvg(c.nodes, c.edges, k, 1) +
-            '<circle cx="' + r1(c.cx) + '" cy="' + r1(c.cy) + '" r="' + r1(9 * k) + '" fill="' + PINE + '"/>' +
-            halo(lx, ly - 2 * k, c.camp.name.toUpperCase(), k, { size: 12 }) + halo(lx, ly + 13 * k, c.camp.memories.toLocaleString('en-US') + ' memories', k, { size: 11, weight: 600, ls: 0, opacity: 0.72 }) + '</g>');
-        } else {
-          s.push('<g class="mk" data-action="explore" data-camp="' + c.camp.id + '" role="button" tabindex="0" aria-label="' + esc(c.camp.name) + ', not connected">' +
-            '<circle cx="' + r1(c.cx) + '" cy="' + r1(c.cy) + '" r="70" fill="' + MIST + '" stroke="' + PINE + '" stroke-opacity="0.6" stroke-width="' + r1(1.5 * k) + '" stroke-dasharray="' + r1(5 * k) + ' ' + r1(5 * k) + '"/>' +
-            iconAt(c.camp.icon, [c.cx, c.cy], 26 * k, 'rgba(28,58,40,0.72)') +
-            halo(c.cx, c.cy + 70 + 18 * k, c.camp.name.toUpperCase(), k, { size: 12, opacity: 0.72 }) + halo(c.cx, c.cy + 70 + 33 * k, '+' + fh(c.camp.hours) + ' h a week', k, { size: 11, weight: 600, ls: 0, opacity: 0.72 }) + '</g>');
-        }
+    var tall = H / W > 1.3, c = opts.camp ? camp(opts.camp) : null, key = c ? c.id : 'whole', sc = scene(opts.camp, tall);
+    var cam = session.cam[key] || (session.cam[key] = { yaw: 0.55, pitch: -0.3, zoom: 1 });
+    var dpr = Math.min(window.devicePixelRatio || 1, 2), reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var small = Math.min(W, H) < 330, core = Math.round(clamp(Math.min(W, H) * 0.15, 40, 60));
+    var html = '';
+    if (!c) {
+      sc.hubs.forEach(function (h, i) {
+        var hc = h.camp;
+        html += isOn(hc.id)
+          ? '<button type="button" class="bl" data-i="' + i + '" data-action="open-camp" data-camp="' + hc.id + '"><b>' + esc(hc.name) + '</b>' + (small ? '' : '<small>' + hc.memories.toLocaleString('en-US') + ' memories</small>') + '</button>'
+          : '<button type="button" class="bl is-off" data-i="' + i + '" data-action="explore" data-camp="' + hc.id + '" aria-label="' + esc(hc.name) + ', not connected"><span class="bl-ico">' + icon(hc.icon, 20, PINE, 1.8) + '</span><b>' + esc(hc.name) + '</b>' + (small ? '' : '<small>+' + fh(hc.hours) + ' h a week</small>') + '</button>';
       });
-      s.push('<g class="mk" data-action="toast" data-msg="Sherpa holds every camp\'s memory in one place. Any AI can use it." role="button" tabindex="0" aria-label="Sherpa"><circle cx="0" cy="0" r="' + r1(30 * k) + '" fill="' + PINE + '"/><image href="assets/icon-white.svg" x="' + r1(-15 * k) + '" y="' + r1(-17 * k) + '" width="' + r1(30 * k) + '" height="' + r1(32 * k) + '"/>' +
-        halo(0, 30 * k + 20 * k, 'SHERPA', k, { size: 12 }) + '</g>');
+      html += '<button type="button" class="bl-core is-you' + (state.photo ? ' has-photo' : '') + '" style="width:' + core + 'px;height:' + core + 'px;font-size:' + Math.round(core * 0.4) + 'px" data-action="toast" data-msg="Everything Sherpa knows about your business, in one place. Any AI can use it." aria-label="You, ' + esc(state.name) + '">' + face() + '</button>';
     } else {
-      var c = camp(opts.camp), L = campLayout(c, portrait), goff = portrait ? 78 : 92;
-      vb = portrait ? [-300, -430, 600, 860] : [-440, -380, 880, 760]; k = 1 / Math.min(W / vb[2], H / vb[3]);
-      s.push('<svg class="brain-svg" xmlns="http://www.w3.org/2000/svg" viewBox="' + vb.join(' ') + '" preserveAspectRatio="xMidYMid meet" width="' + W + '" height="' + H + '">');
-      L.groups.forEach(function (g) { s.push('<line x1="0" y1="0" x2="' + r1(g.cx) + '" y2="' + r1(g.cy) + '" stroke="' + PINE + '" stroke-opacity="0.35" stroke-width="' + r1(1.2 * k) + '"/>'); });
-      L.groups.forEach(function (g) {
-        var lx = g.cx + Math.cos(g.a) * goff, ly = g.cy + Math.sin(g.a) * (goff - 10) + 4 * k;
-        s.push('<g class="mk" data-action="toast" data-msg="' + esc(g.count + ' ' + g.name.toLowerCase() + ' remembered in ' + c.name + '.') + '" role="button" tabindex="0" aria-label="' + esc(g.name + ', ' + g.count) + '">' +
-          '<circle cx="' + r1(g.cx) + '" cy="' + r1(g.cy) + '" r="80" fill="' + MIST + '" fill-opacity="0"/>' + nodesSvg(g.nodes, g.edges, k, 1) + '<circle cx="' + r1(g.cx) + '" cy="' + r1(g.cy) + '" r="' + r1(6 * k) + '" fill="' + PINE + '"/>' +
-          halo(lx, ly, g.name.toUpperCase() + ' ' + g.count, k, { size: 11.5 }) + '</g>');
+      sc.hubs.forEach(function (h, i) {
+        html += '<button type="button" class="bl" data-i="' + i + '" data-action="toast" data-msg="' + esc(h.group[1] + ' ' + h.group[0].toLowerCase() + ' remembered in ' + c.name + '.') + '"><b>' + esc(h.group[0]) + '</b>' + (small ? '' : '<small>' + h.group[1] + '</small>') + '</button>';
       });
-      if (L.named.length > 1) {
-        var d = 'M' + L.named.map(function (m) { return r1(m.x) + ' ' + r1(m.y); }).join(' L');
-        s.push('<path d="' + d + '" fill="none" stroke="' + PINE + '" stroke-width="' + r1(1.6 * k) + '" stroke-linejoin="round"/>');
-      }
-      L.named.forEach(function (m) {
-        s.push('<g class="mk" data-action="memory" data-name="' + esc(m.name) + '" data-group="' + esc(m.group) + '" data-camp="' + c.id + '" role="button" tabindex="0" aria-label="Memory: ' + esc(m.name) + '">' +
-          '<circle cx="' + r1(m.x) + '" cy="' + r1(m.y) + '" r="' + r1(6.5 * k) + '" fill="' + PINE + '" stroke="' + MIST + '" stroke-width="' + r1(2 * k) + '"/>' +
-          halo(m.x + (m.x >= 0 ? 10 : -10) * k, m.y - 8 * k, m.name, k, { anchor: m.x >= 0 ? 'start' : 'end', size: 13, weight: 700, ls: 0 }) + '</g>');
+      sc.named.forEach(function (m, i) {
+        html += '<button type="button" class="bl is-mem" data-m="' + i + '" data-action="memory" data-name="' + esc(m.name) + '" data-group="' + esc(m.group) + '" data-camp="' + c.id + '"><b>' + esc(m.name) + '</b></button>';
       });
-      s.push('<circle cx="0" cy="0" r="' + r1(28 * k) + '" fill="' + MIST + '" stroke="' + PINE + '" stroke-width="' + r1(2 * k) + '"/>' + iconAt(c.icon, [0, 0], 26 * k, PINE));
+      html += '<span class="bl-core is-camp" style="width:' + core + 'px;height:' + core + 'px" aria-hidden="true">' + icon(c.icon, Math.round(core * 0.46), PINE, 1.8) + '</span>';
     }
-    s.push('</svg>');
-    host.innerHTML = s.join('');
-    host.setAttribute('role', 'img');
-    host.setAttribute('aria-label', opts.camp ? camp(opts.camp).name + ' brain: ' + camp(opts.camp).groups.map(function (g) { return g[1] + ' ' + g[0].toLowerCase(); }).join(', ') + '.' : 'Brain of your business: every connected camp around Sherpa.');
+    host.innerHTML = '<canvas class="brain-cv" width="' + Math.round(W * dpr) + '" height="' + Math.round(H * dpr) + '" aria-hidden="true"></canvas><div class="brain-lbls">' + html + '</div>';
+    host.setAttribute('role', 'group');
+    host.setAttribute('aria-label', (c ? c.name + ' brain: ' + c.groups.map(function (g) { return g[1] + ' ' + g[0].toLowerCase(); }).join(', ') : 'Brain of your business: every connected camp around Sherpa') + '. Drag to turn it, pinch or scroll to zoom.');
+    var cv = host.firstChild, g = cv.getContext('2d'), L = host.lastChild;
+    var hubEls = [], memEls = [], coreEl = $('.bl-core', L);
+    $$('.bl[data-i]', L).forEach(function (el) { hubEls[+el.dataset.i] = el; });
+    $$('.bl[data-m]', L).forEach(function (el) { memEls[+el.dataset.m] = el; });
+    var DIST = 1000, unit = Math.min(W * 0.43, (tall ? H / 1.5 : H) * 0.48) / sc.E, sz = clamp(Math.min(W, H) / 480, 0.75, 1.3);
+    var ox = W / 2, oy = H / 2, need = true, last = 0, idle = 0, boxes = [];
+    coreEl.style.transform = 'translate(' + r1(ox - core / 2) + 'px,' + r1(oy - core / 2) + 'px)';
+    function on(h) { return c ? true : isOn(h.camp.id); }
+    function A(z) { return clamp(0.95 - (z + sc.R) / (2 * sc.R) * 0.7, 0.18, 0.95); }
+    function paint() {
+      var cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw), cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch), U = unit * cam.zoom, zs = Math.sqrt(cam.zoom);
+      function P(q) { var x = q.x * cy - q.z * sy, z1 = q.x * sy + q.z * cy, y = q.y * cp - z1 * sp, z = q.y * sp + z1 * cp, f = DIST / (DIST + z); q._x = ox + x * U * f; q._y = oy + y * U * f; q._z = z; q._f = f; }
+      g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H); g.lineCap = 'round';
+      sc.hubs.forEach(function (h) { P(h); if (on(h)) h.nodes.forEach(P); });
+      // spokes from Sherpa to every connected camp
+      g.lineWidth = 1.4;
+      sc.hubs.forEach(function (h) { if (!on(h)) return; g.strokeStyle = pine(A(h._z) * 0.5); g.beginPath(); g.moveTo(ox, oy); g.lineTo(h._x, h._y); g.stroke(); });
+      // camps not made yet: a dashed ring
+      g.setLineDash([4, 5]); g.lineWidth = 1.5;
+      sc.hubs.forEach(function (h) { if (on(h)) return; g.strokeStyle = pine(A(h._z) * 0.9); g.beginPath(); g.arc(h._x, h._y, 24 * sz * h._f * zs, 0, 7); g.stroke(); });
+      g.setLineDash([]);
+      // memory links
+      g.lineWidth = 1;
+      sc.hubs.forEach(function (h) { if (!on(h)) return; h.edges.forEach(function (e) { var a = h.nodes[e[0]], b = h.nodes[e[1]]; g.strokeStyle = pine(A((a._z + b._z) / 2) * 0.3); g.beginPath(); g.moveTo(a._x, a._y); g.lineTo(b._x, b._y); g.stroke(); }); });
+      // memories, far to near
+      var dots = [];
+      sc.hubs.forEach(function (h) { if (!on(h)) return; dots.push(h); h.nodes.forEach(function (n) { dots.push(n); }); });
+      dots.sort(function (a, b) { return b._z - a._z; });
+      dots.forEach(function (n) { var hub = !!n.nodes, r = (hub ? 6 : 1.2 + n.s * 2.4) * sz * n._f * zs; g.fillStyle = pine(hub ? Math.min(1, A(n._z) + 0.2) : A(n._z)); g.beginPath(); g.arc(n._x, n._y, Math.max(0.7, r), 0, 7); g.fill(); });
+      // named memories inside a camp, tied together
+      if (c && sc.named.length) {
+        g.strokeStyle = pine(0.85); g.lineWidth = 1.6; g.beginPath();
+        sc.named.forEach(function (m, i) { var q = m.n; if (i) g.lineTo(q._x, q._y); else g.moveTo(q._x, q._y); }); g.stroke();
+        g.fillStyle = PINE; g.strokeStyle = MIST; g.lineWidth = 2;
+        sc.named.forEach(function (m) { var q = m.n; g.beginPath(); g.arc(q._x, q._y, 6 * sz * zs, 0, 7); g.fill(); g.stroke(); });
+      }
+      place(U);
+    }
+    // Labels follow their clusters. Nearer ones win; one that would sit on another fades out until it's clear.
+    function place(U) {
+      boxes.length = 0;
+      var items = [], act = document.activeElement;
+      hubEls.forEach(function (el, i) { if (el) items.push({ el: el, h: sc.hubs[i], z: sc.hubs[i]._z }); });
+      memEls.forEach(function (el, i) { if (el) items.push({ el: el, m: sc.named[i], z: -1e4 }); });
+      items.sort(function (a, b) { return a.z - b.z; });
+      var cr = core / 2 + 4;
+      items.forEach(function (it) {
+        var el = it.el, w = el._w || (el._w = el.offsetWidth), hh = el._h || (el._h = el.offsetHeight), x, y;
+        if (it.m) { var q = it.m.n, right = q._x >= ox; x = right ? q._x + 10 : q._x - 10 - w; y = q._y - hh / 2; }
+        else if (!on(it.h)) { x = it.h._x - w / 2; y = it.h._y - 20; }
+        else {
+          var h = it.h, vx = h._x - ox, vy = h._y - oy, len = Math.hypot(vx, vy);
+          if (len < 24) { vx = 0; vy = 1; len = 1; }
+          var push = h.r * U * h._f * 0.8 + 10;
+          x = h._x + vx / len * push - w / 2; y = h._y + vy / len * push - hh / 2;
+        }
+        x = clamp(x, 4, W - w - 4); y = clamp(y, 4, H - hh - 4);
+        var box = [x, y, x + w, y + hh];
+        var hit = el !== act && (boxes.some(function (b) { return b[0] < box[2] && box[0] < b[2] && b[1] < box[3] && box[1] < b[3]; }) || (box[0] < ox + cr && ox - cr < box[2] && box[1] < oy + cr && oy - cr < box[3]));
+        el.style.transform = 'translate(' + r1(x) + 'px,' + r1(y) + 'px)';
+        el.style.opacity = hit ? '0' : String(it.h ? Math.round(clamp(1.3 - (it.h._z + sc.R) / (2 * sc.R), 0.5, 1) * 100) / 100 : 1);
+        el.style.pointerEvents = hit ? 'none' : '';
+        if (!hit) boxes.push(box);
+      });
+    }
+    function frame(t) {
+      if (!cv.isConnected) return;
+      var dt = last ? Math.min(64, t - last) : 16; last = t;
+      if (!reduce && !host._held && Date.now() > idle) { cam.yaw += dt * 0.00018; need = true; }
+      if (need) { need = false; paint(); }
+      requestAnimationFrame(frame);
+    }
+    host._brain = {
+      cam: cam,
+      poke: function () { need = true; idle = Date.now() + 3000; },
+      hold: function (v) { host._held = v; if (!v) idle = Date.now() + 3000; },
+      reset: function () { cam.yaw = 0.55; cam.pitch = -0.3; cam.zoom = 1; need = true; idle = Date.now() + 1500; },
+      hit: function (x, y) {
+        var best = null, bd = 1e9;
+        sc.hubs.forEach(function (h, i) { if (!on(h) || !hubEls[i]) return; var d = Math.hypot(h._x - x, h._y - y), r = Math.max(28, h.r * unit * cam.zoom * h._f); if (d < r && d < bd) { bd = d; best = hubEls[i]; } });
+        return best;
+      }
+    };
+    paint();
+    requestAnimationFrame(frame);
   }
 
   function drawView(view) {
     var art = $('.view-art', view); if (!art) return;
     var scope = view.getAttribute('data-scope'), lens = view.getAttribute('data-lens');
-    if (scope === 'onboard') return drawMap(art, {});
-    if (scope === 'home') return lens === 'brain' ? drawBrain(art, {}) : drawMap(art, view.classList.contains('is-preview') ? { center: 'you' } : {});
-    return lens === 'brain' ? drawBrain(art, { camp: scope }) : drawMap(art, { focus: scope });
+    gestures(art);
+    if (scope === 'onboard') { art._mode = null; art._map = art._brain = null; art.classList.remove('is-live'); return drawMap(art, { still: true }); }
+    art.classList.add('is-live');
+    if (scope !== 'home' || lens === 'brain') { art._mode = 'brain'; art._map = null; return drawBrain(art, { camp: scope === 'home' ? null : scope }); }
+    art._mode = 'map'; art._brain = null;
+    // The snapshot, the map and full screen each keep their own place, so moving around one doesn't move the others.
+    var full = view.classList.contains('is-full'), pv = view.classList.contains('is-preview') && !full;
+    drawMap(art, { live: true, key: pv ? 'pv' : full ? 'full' : 'home', center: pv ? 'you' : null });
   }
   var ro = window.ResizeObserver ? new ResizeObserver(function (list) {
     list.forEach(function (en) { var v = en.target.closest('.view'); if (v && en.contentRect.width) { cancelAnimationFrame(v._raf); v._raf = requestAnimationFrame(function () { drawView(v); }); } });
   }) : null;
   function mountViews() {
     $$('.view').forEach(function (v) { drawView(v); if (ro) ro.observe($('.view-art', v)); });
+  }
+
+  /* ================= moving around ================= */
+  // One finger or the mouse drags (moves the map, turns the brain). Two fingers pinch, the wheel zooms.
+  function setVB(art, vb) {
+    var m = art._map; if (!m) return;
+    vb = clampVB(vb, m.g, art.clientWidth, art.clientHeight); session.mapVB[m.key] = vb;
+    var vbs = vb.map(r1).join(' '); $$('svg.map-terrain, svg.map-svg', art).forEach(function (sv) { sv.setAttribute('viewBox', vbs); });
+  }
+  function redrawMap(art, wait) { clearTimeout(art._rt); art._rt = setTimeout(function () { if (art.isConnected && art._map) drawMap(art, art._map.opts); }, wait || 0); }
+  function zoomMap(art, f, x, y) {
+    var m = art._map; if (!m) return;
+    var W = art.clientWidth, H = art.clientHeight; x = x == null ? W / 2 : x; y = y == null ? H / 2 : y;
+    var vb = session.mapVB[m.key] || m.base, nw = vb[2] / f, nh = vb[3] / f, mx = vb[0] + x / W * vb[2], my = vb[1] + y / H * vb[3];
+    setVB(art, [mx - x / W * nw, my - y / H * nh, nw, nh]); redrawMap(art, 160);
+  }
+  function zoomBrain(art, f) { var b = art._brain; if (!b) return; b.cam.zoom = clamp(b.cam.zoom * f, 0.6, 2.6); b.poke(); }
+  function gestures(art) {
+    if (art._gest) return; art._gest = true;
+    var ptrs = {}, s = null, moved = false, lastPt = null;
+    function ids() { return Object.keys(ptrs); }
+    function local(e) { var r = art.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+    function pinch() { var p = ids().map(function (k) { return ptrs[k]; }); return { d: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) || 1, x: (p[0].x + p[1].x) / 2, y: (p[0].y + p[1].y) / 2 }; }
+    function begin() {
+      var two = ids().length > 1, first = ptrs[ids()[0]];
+      if (art._mode === 'map' && art._map) s = { vb: (session.mapVB[art._map.key] || art._map.base).slice(), pt: first, p: two ? pinch() : null };
+      else if (art._mode === 'brain' && art._brain) s = { yaw: art._brain.cam.yaw, pitch: art._brain.cam.pitch, zoom: art._brain.cam.zoom, pt: first, p: two ? pinch() : null };
+      else s = null;
+    }
+    art.addEventListener('pointerdown', function (e) {
+      if (!art._mode || (e.button && e.button !== 0)) return;
+      if (!ids().length) moved = false;
+      ptrs[e.pointerId] = local(e); session.busy = Date.now() + 2500; begin();
+      if (art._brain) art._brain.hold(true);
+    });
+    art.addEventListener('pointermove', function (e) {
+      if (!ptrs[e.pointerId] || !s) return;
+      ptrs[e.pointerId] = local(e); session.busy = Date.now() + 2500;
+      var W = art.clientWidth, H = art.clientHeight, n = ids().length;
+      if (n === 1) {
+        var p = ptrs[e.pointerId], dx = p.x - s.pt.x, dy = p.y - s.pt.y;
+        if (!moved && Math.abs(dx) + Math.abs(dy) < 6) return;
+        if (!moved) { moved = true; try { art.setPointerCapture(e.pointerId); } catch (er) { } }
+        if (art._mode === 'map') setVB(art, [s.vb[0] - dx * s.vb[2] / W, s.vb[1] - dy * s.vb[3] / H, s.vb[2], s.vb[3]]);
+        else if (art._brain) { var c = art._brain.cam; c.yaw = s.yaw + dx * 0.008; c.pitch = clamp(s.pitch + dy * 0.006, -1.2, 1.2); art._brain.poke(); }
+      } else if (n === 2 && s.p) {
+        moved = true;
+        var q = pinch(), f = q.d / s.p.d;
+        if (art._mode === 'map') { var nw = s.vb[2] / f, nh = s.vb[3] / f, mx = s.vb[0] + s.p.x / W * s.vb[2], my = s.vb[1] + s.p.y / H * s.vb[3]; setVB(art, [mx - q.x / W * nw, my - q.y / H * nh, nw, nh]); }
+        else if (art._brain) { art._brain.cam.zoom = clamp(s.zoom * f, 0.6, 2.6); art._brain.poke(); }
+      }
+    });
+    function end(e) {
+      if (!ptrs[e.pointerId]) return;
+      lastPt = ptrs[e.pointerId]; delete ptrs[e.pointerId];
+      session.busy = Date.now() + 1500;
+      if (ids().length) { begin(); return; }
+      s = null;
+      if (art._brain) art._brain.hold(false);
+      if (moved) { session.noClick = Date.now() + 350; if (art._mode === 'map') redrawMap(art, 0); }
+      else if (e.type === 'pointerup' && art._mode === 'brain' && art._brain && !e.target.closest('.bl, .bl-core')) { var el = art._brain.hit(lastPt.x, lastPt.y); if (el) el.click(); }
+    }
+    art.addEventListener('pointerup', end); art.addEventListener('pointercancel', end);
+    art.addEventListener('wheel', function (e) {
+      if (!art._mode) return;
+      e.preventDefault(); session.busy = Date.now() + 1500;
+      var f = Math.exp(-e.deltaY * 0.0015);
+      if (art._mode === 'map') { var p = local(e); zoomMap(art, f, p.x, p.y); } else zoomBrain(art, f);
+    }, { passive: false });
   }
 
   /* ================= overlays ================= */
@@ -759,7 +1123,7 @@
     var f = $('input, button:not(.sheet-x)', wrap) || $('.sheet-x', wrap); if (f) f.focus();
     return wrap;
   }
-  function closeSheet() { var s = $('.scrim'); if (s) { s.remove(); if (session.lastFocus && session.lastFocus.focus && document.body.contains(session.lastFocus)) session.lastFocus.focus(); } }
+  function closeSheet() { var s = $('.scrim'); if (s) { s.remove(); if (session.lastFocus && session.lastFocus.focus && document.body.contains(session.lastFocus)) session.lastFocus.focus(); if (session.dirty) liveRender(); } }
   var toastT;
   function toast(msg) {
     var t = $('#toast'); if (!t) return;
@@ -771,9 +1135,16 @@
     var c = camp(id);
     sheet('<div class="sheet-head">' + campDisc(c, 48, true) + '<div class="col"><h2>' + esc(c.name) + '</h2><span class="soft">About +' + fh(c.hours) + ' h a week</span></div></div>' + connectBlock(c), { label: 'Make camp: ' + c.name });
   }
+  function baseSheet() {
+    var n = coreMade();
+    sheet('<div class="sheet-head"><span class="cdisc" style="width:48px;height:48px">' + icon('base', 22, PINE, 1.8) + '</span><div class="col"><h2>Base Camp</h2><span class="soft">' + (n ? 'Pick the AIs that run Sherpa.' : 'Make a camp on the way up first.') + '</span></div></div>' +
+      (n ? '<div class="tiles2" role="group" aria-label="AI models">' + D.MODELS.map(function (m) {
+        return '<button type="button" class="tile-radio" role="checkbox" aria-checked="' + (state.models.indexOf(m.id) > -1) + '" data-action="model" data-model="' + m.id + '"><b>' + m.id + '</b><span>' + m.by + '</span></button>';
+      }).join('') + '</div><button type="button" class="btn primary block lg" data-action="make-base">Make Base Camp</button><p class="fine">From here, every hour Sherpa saves you counts toward the summit.</p>' : ''), { label: 'Base Camp' });
+  }
   function accountMenu() {
-    sheet('<div class="sheet-head">' + '<span class="avatar big">' + esc(initial()) + '</span><div class="col"><h2>' + esc(state.name) + '</h2><span class="soft">Climbing to ' + state.summit + ' h a week</span></div></div>' +
-      '<div class="menu"><a href="#gear" data-action="close-sheet-go" data-to="gear">Gear</a><a href="#report" data-action="close-sheet-go" data-to="report">Friday trail report</a><a href="#camps" data-action="close-sheet-go" data-to="camps">Camps</a></div>', { label: 'Account', cls: 'small' });
+    sheet('<div class="sheet-head">' + '<span class="avatar big' + (state.photo ? ' has-photo' : '') + '">' + face() + '</span><div class="col"><h2>' + esc(state.name) + '</h2><span class="soft">Climbing to ' + state.summit + ' h a week</span></div></div>' +
+      '<div class="menu"><a href="#gear" data-action="close-sheet-go" data-to="gear">Gear</a><a href="#report" data-action="close-sheet-go" data-to="report">Trail report</a><a href="#camps" data-action="close-sheet-go" data-to="camps">Camps</a></div>', { label: 'Account', cls: 'small' });
   }
   function checkin() {
     var list = openApprovals();
@@ -793,39 +1164,56 @@
     sheet(receipt(e), { pine: true, label: 'Receipt', cls: 'receipt' });
   }
   function chatSheet() {
-    sheet('<h2 class="chat-title">Ask Sherpa</h2><div class="chat" aria-live="polite">' + session.chat.map(function (m) { return '<div class="msg ' + m.who + '">' + esc(m.text) + '</div>'; }).join('') + '</div>' + askBar('Ask Sherpa', false, 'ask-s'), { label: 'Ask Sherpa', cls: 'chat-sheet' });
+    var a = session.chatAbout && openApprovals().filter(function (x) { return x.id === session.chatAbout; })[0];
+    sheet((a ? '<h2 class="chat-title">' + esc(a.who) + '</h2><div class="soft">' + esc(a.what) + '</div><div class="appr-more chat-draft"><div class="appr-kind">' + esc(a.kind) + '</div><p>' + esc(a.detail) + '</p></div>' : '<h2 class="chat-title">Ask Sherpa</h2>') + '<div class="chat" aria-live="polite">' + session.chat.map(function (m) { return '<div class="msg ' + m.who + '">' + esc(m.text) + '</div>'; }).join('') + '</div>' +
+      (a ? '<div class="chat-acts"><button type="button" class="btn primary sm" data-action="approve" data-id="' + a.id + '">' + esc(a.verb) + '</button><button type="button" class="btn ghost sm" data-action="reject" data-id="' + a.id + '">Reject</button></div>' : '') +
+      askBar(a ? 'Ask, or say what to change' : 'Ask Sherpa', false, 'ask-s'), { label: a ? 'Chat about ' + a.who : 'Ask Sherpa', cls: 'chat-sheet' });
     var c = $('.chat'); if (c) c.scrollTop = c.scrollHeight;
   }
   function answer(q) {
     var t = q.toLowerCase(), n = openApprovals();
+    var a = session.chatAbout && n.filter(function (x) { return x.id === session.chatAbout; })[0];
+    if (a) {
+      if (/^(no\b|nope|reject|don'?t|do not|drop|cancel|skip)/.test(t)) { session.chatAct = { kind: 'reject', a: a }; return 'Done. ' + a.no; }
+      if (/^(yes|yep|ok|okay|sure|go ahead|do it|send|approve|confirm|looks good)/.test(t)) { session.chatAct = { kind: 'approve', a: a }; return 'Done. ' + a.log + '.'; }
+      if (/why|how come|reason|where/.test(t)) return a.why;
+      if (/change|edit|shorter|longer|tone|reword|rewrite|instead|add|remove|make it|warmer|formal|friendlier|move/.test(t)) return 'Got it. I\'ll make that change and bring it back to you before anything goes out.';
+      return 'Tell me what to change, or ' + a.verb.toLowerCase() + ' it as it is.';
+    }
     if (/elev|hour|summit|how far|progress|time back/.test(t)) {
       var tr = nextTrail();
-      return 'You\'re at ' + f1(elevation()) + ' h a week. ' + (toGo() > 0 ? fh(toGo()) + ' to the summit.' : 'You made the summit.') + (tr ? ' Biggest open trail: ' + tr.title.toLowerCase() + ', +' + fh(tr.hours) + ' h.' : '');
+      return 'I\'ve saved you ' + f1(elevation()) + ' h this week. ' + (toGo() > 0 ? fh(toGo()) + ' to the summit.' : 'You made the summit.') + (tr ? ' Biggest open trail: ' + tr.title.toLowerCase() + ', about +' + fh(tr.hours) + ' h.' : '');
     }
     if (/need|approv|waiting|pending|inbox/.test(t)) return n.length ? words(n.length) + ' things need you: ' + n.map(function (a) { return a.who + ' (' + a.what.toLowerCase() + ')'; }).join(', ') + '.' : 'Nothing needs you right now.';
-    if (/today|log|did you|done/.test(t)) { var es = entries().filter(function (e) { return e.day === 'Today' && !e.undone; }); return 'Today I saved you ' + todayMinutes() + ' minutes. ' + es.slice(0, 2).map(function (e) { return e.text; }).join('. ') + '.'; }
+    if (/today|log|did you|done/.test(t)) { var es = entries().filter(function (e) { return e.day === 'Today' && !e.undone; }); return es.length ? 'Today I saved you ' + todayMinutes() + ' minutes. ' + es.slice(0, 2).map(function (e) { return e.text; }).join('. ') + '.' : 'Nothing finished yet today. I\'m on it.'; }
     if (/camp|tool|connect/.test(t)) { var u = unexplored(); return u.length ? 'You have ' + (D.CAMPS.length - u.length) + ' camps. ' + u[0].name + ' is next, about +' + fh(u[0].hours) + ' h.' : 'Every camp is made.'; }
     return 'I can\'t reach your tools in this demo, so I can\'t answer that yet. Once they\'re connected, I\'ll answer from them.';
   }
 
   /* ================= actions ================= */
-  function afterGain(before, msg) {
+  function crossSummit(before) {
     var e = elevation();
-    if (state.onboarded && before < state.summit && e >= state.summit && state.reached !== state.summit) { nextPick = null; save(); toast(msg); go('summit'); return; }
-    toast(msg);
-    render();
+    if (state.onboarded && before < state.summit && e >= state.summit && state.reached !== state.summit) { nextPick = null; save(); toast('You made the summit.'); go('summit'); return true; }
+    return false;
   }
+  function afterGain(before, msg) { if (crossSummit(before)) return; toast(msg); render(); }
   function connectCamp(id) {
-    var c = camp(id), tool = session.pendingTool[id] || c.tools[0];
+    var c = camp(id), left = c.tools.filter(function (t) { return toolsOf(id).indexOf(t) < 0; });
+    var tool = left.indexOf(session.pendingTool[id]) > -1 ? session.pendingTool[id] : left[0];
+    if (!tool) return;
     session.connecting = id; refreshConnect();
     setTimeout(function () {
       var before = elevation();
       session.connecting = null;
-      state.camps[id] = { tool: tool, at: Date.now() };
+      var adding = isOn(id);
+      if (adding) state.camps[id].tools.push(tool); else state.camps[id] = { tools: [tool], at: Date.now() };
       if (session.openRow === id) session.openRow = null;
+      delete session.pendingTool[id];
       save(); closeSheet();
-      var msg = c.name + ' camp made with ' + tool + '. +' + fh(c.hours) + ' h a week.';
-      if (!state.onboarded) { toast(msg); render(); return; }
+      if (adding) { soon(); toast(tool + ' added. Sherpa now works across ' + toolsLabel(id) + '.'); render(); return; }
+      if (!state.onboarded) { toast(c.name + ' camp made with ' + tool + '.'); render(); return; }
+      soon();
+      var msg = c.name + ' camp made with ' + tool + '.' + (climbing() ? ' Sherpa starts working there now.' : coreMade() === 1 ? ' Base Camp is next whenever you\'re ready.' : '');
       afterGain(before, msg);
     }, 1100);
   }
@@ -840,35 +1228,73 @@
     'hours': function (el) { state.summit = clamp(state.summit + Number(el.dataset.d), 1, 60); save(); render(); },
     'set-hours': function (el) { state.summit = Number(el.dataset.n); save(); render(); },
     'set-why': function (el) { state.why = el.dataset.why; save(); render(); },
-    'row': function (el) { var id = el.dataset.camp; if (!state.onboarded && parse().step !== 'camps') return; session.openRow = session.openRow === id ? null : id; render(); },
     'pick-tool': function (el) { session.pendingTool[el.dataset.camp] = el.dataset.tool; var sc = $('.scrim'); if (sc) { var box = $('.connect', sc); if (box) { box.outerHTML = connectBlock(camp(el.dataset.camp)); return; } } render(); },
     'connect': function (el) { if (session.connecting) return; connectCamp(el.dataset.camp); },
-    'model': function (el) { state.model = el.dataset.model; save(); if (state.onboarded) toast('Base Camp now runs on ' + state.model + '. Your memories came with you.'); render(); },
-    'finish': function () { state.onboarded = true; state.step = 'done'; save(); toast('Base Camp made. The climb starts now.'); go('home'); },
+    'model': function (el) {
+      var id = el.dataset.model, i = state.models.indexOf(id);
+      if (i > -1) { if (state.models.length === 1) { toast('Keep at least one AI at Base Camp.'); return; } state.models.splice(i, 1); }
+      else state.models.push(id);
+      save();
+      $$('.scrim [data-action="model"]').forEach(function (b) { b.setAttribute('aria-checked', String(state.models.indexOf(b.dataset.model) > -1)); });
+      if (climbing()) toast('Base Camp runs on ' + modelsLabel() + '. Your memories work with all of them.');
+      render();
+    },
+    'start-climb': function () { state.onboarded = true; state.step = 'done'; save(); toast('You\'re at the trailhead. Make your first camp.'); go('home'); },
+    'basecamp': function () { baseSheet(); },
+    'appr-open': function (el) { session.apprOpen[el.dataset.id] = !session.apprOpen[el.dataset.id]; render(); },
+    'make-base': function () {
+      if (!coreMade()) { toast('Make a camp first.'); return; }
+      state.baseAt = Date.now(); state.nextAt = state.baseAt + 4000; state.done = []; state.cursor = 0; save();
+      closeSheet(); toast('Base Camp made. From here, every hour Sherpa saves you counts.'); render();
+    },
+    'photo-remove': function () { state.photo = ''; save(); render(); },
     'lens': function (el) {
       var v = el.closest('.view'), scope = v.dataset.scope, lens = el.dataset.lens;
-      if (scope === 'home') { state.lens = lens; save(); } else session.campLens[scope] = lens;
+      if (scope !== 'home') return;
+      state.lens = lens; save();
       v.dataset.lens = lens; $$('[data-action="lens"]', v).forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.lens === lens)); });
-      v.setAttribute('aria-label', (scope === 'home' ? 'Your mountain' : camp(scope).name) + ', ' + lens + ' view');
+      v.setAttribute('aria-label', 'Your mountain, ' + lens + ' view');
       drawView(v);
     },
     'full': function () { session.full = !session.full; render(); },
     'open-camp': function (el) { if (session.full) session.full = false; go('camp-' + el.dataset.camp); },
-    'explore': function (el) { if (!state.onboarded) return; exploreSheet(el.dataset.camp); },
+    'explore': function (el) {
+      if (!state.onboarded) return;
+      var c = camp(el.dataset.camp);
+      if (!c.core && !climbing()) { toast(c.name + ' opens up once Base Camp is made.'); return; }
+      exploreSheet(c.id);
+    },
     'go': function (el) { go(el.dataset.to); },
     'toast': function (el) { toast(el.dataset.msg); },
     'summit': function () { if (!state.onboarded) { toast('Your summit: ' + state.summit + ' h a week, for ' + state.why.toLowerCase() + '.'); return; } if (elevation() >= state.summit) go('summit'); else toast('Summit: ' + state.summit + ' h a week. ' + fh(toGo()) + ' to go.'); },
-    'approve': function (el) { var a = D.APPROVALS.filter(function (x) { return x.id === el.dataset.id; })[0]; doApprove([a]); },
+    'approve': function (el) {
+      var a = apprOf(el.dataset.id), inChat = !!el.closest('.chat-sheet');
+      if (inChat) session.chat.push({ who: 'sherpa', text: 'Done. ' + a.log + '.' });
+      doApprove([a]); if (inChat && location.hash !== '#summit') chatSheet();
+    },
+    'reject': function (el) {
+      var a = apprOf(el.dataset.id), inChat = !!el.closest('.chat-sheet');
+      if (inChat) session.chat.push({ who: 'sherpa', text: 'Done. ' + a.no });
+      doReject(a, inChat); if (inChat) chatSheet();
+    },
+    'appr-chat': function (el) {
+      var a = apprOf(el.dataset.id);
+      if (session.chatAbout !== a.id) { session.chat = []; session.chatAbout = a.id; session.chat.push({ who: 'sherpa', text: a.why + ' ' + a.verb + ' it, reject it, or tell me what to change.' }); }
+      chatSheet();
+    },
     'approve-all': function () { doApprove(openApprovals()); },
     'take': function (el) {
-      var t = D.TRAILS.filter(function (x) { return x.id === el.dataset.id; })[0], before = elevation();
-      state.trails[t.id] = 'taken';
-      state.added.push({ id: 'n' + Date.now(), day: 'Today', time: nowTime(), text: 'Took over: ' + t.title.toLowerCase(), camp: t.camp, min: Math.round(t.hours * 60 / 5), src: 'tool' });
-      save();
-      var e = elevation();
-      afterGain(before, 'Elevation +' + fh(t.hours) + ' h. ' + (e >= state.summit ? 'Summit in reach.' : fh(r1(state.summit - e)) + ' to the summit.'));
+      var t = D.TRAILS.filter(function (x) { return x.id === el.dataset.id; })[0];
+      state.trails[t.id] = 'taken'; soon(); save();
+      toast('Sherpa has it. About +' + fh(t.hours) + ' h a week once it\'s running.'); render();
     },
     'snooze': function (el) { session.snoozed[el.dataset.id] = true; toast("Okay. I'll ask again next week."); render(); },
+    'report-later': function () { markReportRead(); render(); },
+    'disconnect': function (el) {
+      var cm = state.camps[el.dataset.camp]; if (!cm || cm.tools.length < 2) return;
+      cm.tools = cm.tools.filter(function (t) { return t !== el.dataset.tool; }); save();
+      toast(el.dataset.tool + ' removed from ' + camp(el.dataset.camp).name + '.'); render();
+    },
     'perm': function (el) { state.perms[el.dataset.camp] = el.dataset.perm; save(); toast({ read: 'Sherpa will only read in ' + camp(el.dataset.camp).name + '.', ask: 'Sherpa will ask before acting in ' + camp(el.dataset.camp).name + '.', act: 'Sherpa will act alone in ' + camp(el.dataset.camp).name + ' and log every step.' }[el.dataset.perm]); render(); },
     'log-camp': function (el) { session.logCamp = el.dataset.camp; session.logSel = null; render(); },
     'log-open': function (el) { if (desk()) { session.logSel = el.dataset.id; render(); } else receiptSheet(el.dataset.id); },
@@ -881,34 +1307,45 @@
     'checkin-text': function () { closeSheet(); toast("Okay. I'll text you the short version."); },
     'checkin-answer': function () { closeSheet(); go(desk() ? 'home' : 'approvals'); },
     'memory': function (el) { memorySheet(el.dataset.name, el.dataset.group, el.dataset.camp); },
-    'protect': function (el) { state.protect = el.dataset.p; save(); toast('Protected: ' + state.protect.toLowerCase() + '.'); render(); },
     'gear-summit': function (el) { state.summit = clamp(state.summit + Number(el.dataset.d), 1, 60); save(); render(); },
     'reset-ask': function () { session.confirmReset = true; render(); },
     'reset-cancel': function () { session.confirmReset = false; render(); },
-    'reset': function () { try { localStorage.removeItem(KEY); } catch (e) { } state = fresh(); session.confirmReset = false; session.chat = []; session.snoozed = {}; session.campLens = {}; brainCache = {}; go('start-name'); toast('Fresh start.'); },
+    'reset': function () { try { localStorage.removeItem(KEY); } catch (e) { } state = fresh(); session.confirmReset = false; session.chat = []; session.chatAbout = null; session.snoozed = {}; session.cam = {}; session.mapVB = {}; brainCache = {}; go('start-welcome'); },
     'next-pick': function (el) { nextPick = el.dataset.v === 'hold' ? 'hold' : Number(el.dataset.v); render(); },
     'next-set': function () {
       state.summits = (state.summits || 0) + 1; state.reached = state.summit;
-      if (nextPick !== 'hold') state.summit = nextPick;
+      if (nextPick !== 'hold') { state.summit = nextPick; state.mapN = (state.mapN || 1) + 1; }
       nextPick = null; save();
-      toast(state.reached === state.summit ? 'Holding at ' + state.summit + '. Enjoy the view.' : 'New summit: ' + state.summit + ' h a week. The climb continues.');
+      toast(state.reached === state.summit ? 'Holding at ' + state.summit + '. Enjoy the view.' : 'A new mountain. Summit ' + state.summit + ' h a week.');
       go('home');
     },
-    'share': function () { toast('Your award gets a share link here.'); }
+    'share': function () { toast('Your award gets a share link here.'); },
+    'zoom': function (el) { var art = $('.view-art', el.closest('.view')); if (!art) return; if (art._mode === 'map') zoomMap(art, Number(el.dataset.f)); else zoomBrain(art, Number(el.dataset.f)); },
+    'recenter': function (el) {
+      var art = $('.view-art', el.closest('.view')); if (!art) return;
+      if (art._mode === 'map' && art._map) { delete session.mapVB[art._map.key]; drawMap(art, art._map.opts); } else if (art._brain) art._brain.reset();
+    }
   };
+  // Rejecting saves no time and nothing goes out. Sherpa remembers it, so the next one is closer.
+  function doReject(a, quiet) {
+    state.rejected[a.id] = true; session.apprOpen[a.id] = false; save();
+    if (!quiet) toast('Rejected. ' + a.no);
+    render();
+  }
   function doApprove(list) {
-    list.forEach(function (a) {
+    var before = elevation(), now = Date.now();
+    list.forEach(function (a, i) {
       state.approvals[a.id] = true;
-      state.added.push({ id: 'n' + Date.now() + a.id, day: 'Today', time: nowTime(), text: a.log, camp: a.camp, min: a.min, src: a.src });
+      state.done.push({ id: 'a' + now + a.id, ts: now + i, text: a.log, camp: a.camp, min: a.min, src: a.src });
     });
     save();
-    var n = openApprovals().length;
-    toast(list.length === 1 ? list[0].who + ': done. +' + list[0].min + ' min today.' : 'All clear. +' + list.reduce(function (s, a) { return s + a.min; }, 0) + ' min today.');
+    if (crossSummit(before)) return;
+    toast(list.length === 1 ? list[0].who + ': done. +' + list[0].min + ' min saved.' : 'All clear. +' + list.reduce(function (s, a) { return s + a.min; }, 0) + ' min saved.');
     render();
-    if (n === 0 && !desk() && parse().name === 'approvals') { /* stays on the clear state */ }
   }
 
   document.addEventListener('click', function (e) {
+    if (Date.now() < session.noClick && e.target.closest('.view-art')) { e.preventDefault(); return; }
     var el = e.target.closest('[data-action]');
     if (!el || el.disabled) return;
     var fn = handlers[el.dataset.action]; if (!fn) return;
@@ -929,10 +1366,29 @@
     } else if (kind === 'rename') {
       var n = $('#gear-name').value.trim(); if (n) { state.name = n.slice(0, 24); save(); toast('Got it, ' + state.name + '.'); render(); }
     } else if (kind === 'ask') {
+      // asking from anywhere but an open chat starts a fresh conversation, not one about an approval
+      if (!f.closest('.chat-sheet') && session.chatAbout) { session.chatAbout = null; session.chat = []; }
       var q = f.elements.q.value.trim(); if (!q) { chatSheet(); return; }
       session.chat.push({ who: 'me', text: q }); session.chat.push({ who: 'sherpa', text: answer(q) });
-      chatSheet();
+      var act = session.chatAct; session.chatAct = null;
+      if (act) { if (act.kind === 'reject') doReject(act.a, true); else doApprove([act.a]); }
+      if (location.hash !== '#summit') chatSheet();
     } else if (kind === 'log-search') { /* live search below */ }
+  });
+  document.addEventListener('change', function (e) {
+    if (e.target.id !== 'photo-in' || !e.target.files || !e.target.files[0]) return;
+    var file = e.target.files[0], url = URL.createObjectURL(file), img = new Image();
+    img.onload = function () {
+      var S = 192, c = document.createElement('canvas'), m = Math.min(img.width, img.height);
+      c.width = c.height = S;
+      var cx2 = c.getContext('2d'); cx2.fillStyle = MIST; cx2.fillRect(0, 0, S, S);
+      cx2.drawImage(img, (img.width - m) / 2, (img.height - m) / 2, m, m, 0, 0, S, S);
+      URL.revokeObjectURL(url);
+      try { state.photo = c.toDataURL('image/jpeg', 0.85); save(); } catch (er) { toast('That photo didn\'t work. Try another.'); }
+      render();
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); toast('That photo didn\'t work. Try another.'); };
+    img.src = url;
   });
   document.addEventListener('input', function (e) {
     if (e.target.id === 'log-q') {
@@ -946,7 +1402,6 @@
   function render() {
     var r = parse();
     if (location.hash !== '#' + r.hash) { window.history.replaceState(null, '', '#' + r.hash); }
-    if (r.name !== 'camp' || session.last !== r.hash) { if (r.name === 'camp' && session.last !== r.hash) session.campLens[r.camp] = 'brain'; }
     if (session.last && session.last !== r.hash && session.full) session.full = false;
     var html =
       r.name === 'start' ? renderStart(r) :
@@ -968,8 +1423,20 @@
     session.last = r.hash;
     if (changed) { window.scrollTo(0, 0); var m = $('#main'); if (m) m.scrollTop = 0; }
   }
+  // New finished work shows up on its own, but never mid-gesture, mid-typing or under an open sheet.
+  function liveRender() {
+    var a = document.activeElement, typing = a && /^(INPUT|TEXTAREA)$/.test(a.tagName), keys = false;
+    try { keys = a && a !== document.body && app.contains(a) && a.matches(':focus-visible'); } catch (e) { }
+    if ($('.scrim') || Date.now() < session.busy || typing || keys) { session.dirty = true; return; }
+    session.dirty = false; render();
+  }
+  function tick() {
+    var before = elevation(), n = work(Date.now());
+    if (n) { save(); if (state.done.length === n) toast('Sherpa finished its first task. Time saved starts now.'); if (crossSummit(before)) return; }
+    if (n || session.dirty) liveRender();
+  }
   function titleFor(r) {
-    return { start: 'Setup', home: 'Home', map: 'Map', approvals: 'Approvals', camps: 'Camps', camp: r.camp ? camp(r.camp).name : 'Camp', log: 'Trail log', report: 'Friday trail report', gear: 'Gear', summit: 'Summit' }[r.name];
+    return { start: 'Setup', home: 'Home', map: 'Map', approvals: 'Approvals', camps: 'Camps', camp: r.camp ? camp(r.camp).name : 'Camp', log: 'Trail log', report: 'Trail report', gear: 'Gear', summit: 'Summit' }[r.name];
   }
 
   function boot() {
@@ -977,6 +1444,7 @@
     window.addEventListener('hashchange', render);
     if (deskMQ.addEventListener) deskMQ.addEventListener('change', render); else if (deskMQ.addListener) deskMQ.addListener(render);
     render();
+    setInterval(tick, 1000);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
