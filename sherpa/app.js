@@ -55,7 +55,7 @@
   /* ================= state ================= */
   var KEY = 'apex-sherpa-app-v3';
   function fresh() {
-    return { name: '', photo: '', onboarded: false, step: 'welcome', summit: 20, why: 'Family', camps: {}, models: ['Claude'], approvals: {}, rejected: {}, trails: {}, perms: {}, undone: {}, reached: 0, summits: 0, lens: 'map', baseAt: 0, done: [], nextAt: 0, cursor: 0, mapN: 1 };
+    return { name: '', photo: '', onboarded: false, step: 'welcome', summit: 20, whys: ['Family'], camps: {}, models: ['Claude'], approvals: {}, rejected: {}, trails: {}, perms: {}, undone: {}, reached: 0, summits: 0, lens: 'map', baseAt: 0, done: [], nextAt: 0, cursor: 0, mapN: 1, rate: 150, cohort: '', cleared: [], stepsDone: {}, blocked: {} };
   }
   var state = load();
   function load() {
@@ -63,20 +63,43 @@
     try { var raw = localStorage.getItem(KEY); if (raw) { var o = JSON.parse(raw); for (var k in o) if (o.hasOwnProperty(k)) s[k] = o[k]; } } catch (e) { }
     for (var id in s.camps) { var cm = s.camps[id]; if (cm && !cm.tools) cm.tools = cm.tool ? [cm.tool] : []; }
     if (!s.models || !s.models.length) s.models = [s.model || 'Claude'];
+    if (s.why && !(s.whys && s.whys.length)) s.whys = [s.why];
+    if (s.cohort === 'service') s.cohort = 'trades';
+    s.models = s.models.map(function (m) { return m === 'GPT' ? 'ChatGPT' : m === 'Llama' ? 'Other' : m; }).filter(function (m, i, a) { return a.indexOf(m) === i; });
+    delete s.why;
     return s;
   }
   function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { } }
 
-  var session = { snoozed: {}, pendingTool: {}, connecting: null, openRow: null, logCamp: 'all', logQuery: '', logSel: null, chat: [], full: false, nameError: false, confirmReset: false, last: null, mapVB: {}, cam: {}, busy: 0, noClick: 0, dirty: false, apprOpen: {} };
+  var session = { snoozed: {}, pendingTool: {}, connecting: null, openRow: null, logCamp: 'all', logQuery: '', logSel: null, chat: [], full: false, nameError: false, last: null, mapVB: {}, cam: {}, busy: 0, noClick: 0, dirty: false, apprOpen: {} };
 
   /* ================= derived data ================= */
-  function camp(id) { for (var i = 0; i < D.CAMPS.length; i++) if (D.CAMPS[i].id === id) return D.CAMPS[i]; return null; }
-  function isOn(id) { return !!state.camps[id]; }
+  function find(list, id) { for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i]; return null; }
+  // A camp from your industry's map; an old entry from a camp your industry doesn't use still resolves, so the
+  // trail log never breaks.
+  function camp(id) { return find(D.CAMPS, id) || find(D.ALL_CAMPS, id); }
+  function isOn(id) { return !!state.camps[id] && !!find(D.CAMPS, id); }
+  function industry(id) { return find(D.INDUSTRIES, id || state.cohort) || D.INDUSTRIES[0]; }
+  // Your industry decides the map: which camps exist, which four are everyday camps, and what each is called
+  // and connects to. Switching industry draws a new mountain.
+  function applyIndustry() {
+    var ind = industry();
+    D.CAMPS.length = 0;
+    ind.camps.forEach(function (id) {
+      var b = find(D.ALL_CAMPS, id), o = ind.over[id] || {}, c = {};
+      for (var k in b) c[k] = b[k];
+      for (k in o) c[k] = o[k];
+      if (o.name && !o.short) c.short = o.name;
+      c.core = ind.core.indexOf(id) > -1;
+      D.CAMPS.push(c);
+    });
+    worlds = {}; brainCache = {}; session.mapVB = {};
+  }
   // Every camp can hold several connectors (Gmail and Outlook, Slack and Teams), and Base Camp several AIs.
   function toolsOf(id) { var cm = state.camps[id]; return cm && cm.tools ? cm.tools : []; }
   function toolOf(id) { return toolsOf(id)[0] || camp(id).tools[0]; }
   function toolsLabel(id) { return toolsOf(id).join(' + ') || camp(id).tools[0]; }
-  function modelsLabel() { return state.models.join(' + '); }
+  function modelsLabel() { return state.models.map(function (m) { return m === 'Other' ? 'Other AI' : m; }).join(' + '); }
   function sourceOf(entry) {
     if (entry.camp === 'mail') { var g = toolsOf('mail').indexOf('Gmail') > -1 || !toolsOf('mail').length; return entry.src === 'cal' ? (g ? 'Google Calendar' : 'Outlook') : (g ? 'Gmail' : toolOf('mail')); }
     return toolOf(entry.camp);
@@ -100,7 +123,14 @@
   function madeCount() { return D.CAMPS.filter(function (c) { return isOn(c.id); }).length; }
   function madeNames() { return D.CAMPS.filter(function (c) { return isOn(c.id); }).map(function (c) { return c.name; }); }
   function listing(a) { return a.length < 2 ? a.join('') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1]; }
-  function openApprovals() { return climbing() ? D.APPROVALS.filter(function (a) { return isOn(a.camp) && !state.approvals[a.id] && !state.rejected[a.id]; }) : []; }
+  // Things that need you arrive as Sherpa works: two to start, then one more every few tasks it finishes today,
+  // only from camps you've connected. Oldest first.
+  function arrivedApprovals() {
+    if (!climbing()) return [];
+    var a0 = startOfDay(), n = 2 + Math.floor(liveDone().filter(function (d) { return d.ts >= a0; }).length / 3);
+    return D.APPROVALS.filter(function (a) { return isOn(a.camp); }).slice(0, n);
+  }
+  function openApprovals() { return arrivedApprovals().filter(function (a) { return !state.approvals[a.id] && !state.rejected[a.id]; }); }
   function apprOf(id) { return D.APPROVALS.filter(function (a) { return a.id === id; })[0]; }
   function unexplored() { return D.CAMPS.filter(function (c) { return !isOn(c.id); }); }
   var WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -114,10 +144,14 @@
   }
   function initial() { return (state.name || '?').trim().charAt(0).toUpperCase() || '?'; }
 
-  /* Sherpa at work. After Base Camp it finishes real tasks in your connected camps and on the trails you've
-     handed over, at a demo pace. Each task is logged with the time it would have taken you, and that logged time
+  /* Sherpa at work. After Base Camp it finishes real tasks in your connected camps, at a demo pace. Each task is logged with the time it would have taken you, and that logged time
      is the only thing that counts as time saved. No estimates. More camps and trails give Sherpa more to do. */
-  var PACE = 12000;
+  // A camp only has so much busywork in a day: Sherpa saves at most two hours in each one per day, then rests
+  // there until tomorrow. Settings has a demo button to skip ahead a day.
+  var PACE = 12000, CAMP_DAY = 120;
+  function campToday(id) { var a = startOfDay(); return liveDone().filter(function (d) { return d.ts >= a && d.camp === id; }).reduce(function (s2, d) { return s2 + d.min; }, 0); }
+  function openWork() { return workQueue().filter(function (t) { return campToday(t.camp) + t.min <= CAMP_DAY; }); }
+  function resting() { return climbing() && state.introSeen && madeCount() > 0 && !openWork().length; }
   function workQueue() {
     var list = D.TASKS.filter(function (t) { return isOn(t.camp); });
     D.TRAILS.forEach(function (t) { if (state.trails[t.id] === 'taken') list.push({ text: t.done, camp: t.camp, min: t.min, src: 'tool' }); });
@@ -130,8 +164,8 @@
     if (now - state.nextAt > PACE * 3) state.nextAt = now - PACE * 2; // away a while: catch up a little, never a flood
     var n = 0;
     while (now >= state.nextAt && n < 3) {
-      var list = workQueue();
-      if (!list.length) { state.nextAt = now + PACE; break; }
+      var list = openWork();
+      if (!list.length) { state.nextAt = workQueue().length ? startOfDay() + DAY + 8 * 3600000 : now + PACE; break; }
       var t = list[state.cursor % list.length];
       state.cursor++;
       state.done.push({ id: 'd' + state.nextAt + '-' + state.cursor, ts: state.nextAt, text: t.text, camp: t.camp, min: t.min, src: t.src || 'tool' });
@@ -144,16 +178,16 @@
 
   /* ================= routing ================= */
   
-  var KNOWN = ['home', 'map', 'approvals', 'log', 'camps', 'gear', 'report', 'summit'];
+  var KNOWN = ['home', 'map', 'approvals', 'log', 'camps', 'gear', 'report', 'summit', 'leaderboard'];
   function parse() {
     var h = (location.hash || '').replace(/^#\/?/, '');
-    if (!state.onboarded) { if (!/^start-(welcome|name|summit|coords|trailhead)$/.test(h)) h = 'start-' + state.step; }
+    if (!state.onboarded) { if (!/^start-(welcome|name|industry|summit|rate|coords|trailhead)$/.test(h)) h = 'start-' + state.step; }
     else if (!h || /^start-/.test(h)) h = 'home';
     var m = h.match(/^camp-([a-z]+)$/);
     if (m && !camp(m[1])) { h = 'camps'; m = null; }
     if (!m && !/^start-/.test(h) && KNOWN.indexOf(h) < 0) h = 'home';
     var name = m ? 'camp' : (/^start-/.test(h) ? 'start' : h);
-    var section = { home: 'home', map: 'home', approvals: 'home', summit: 'home', camps: 'camps', camp: 'camps', log: 'log', report: 'log', gear: 'gear', start: 'start' }[name];
+    var section = { home: 'home', map: 'home', approvals: 'approvals', summit: 'home', leaderboard: 'leaderboard', camps: 'camps', camp: 'camps', log: 'log', report: 'log', gear: 'gear', start: 'start' }[name];
     return { hash: h, name: name, camp: m ? m[1] : null, step: name === 'start' ? h.slice(6) : null, section: section };
   }
   function go(h) { if (location.hash === '#' + h) render(); else location.hash = '#' + h; }
@@ -176,7 +210,7 @@
   function elevCard(compact) {
     if (!climbing()) return '<section class="elev" aria-label="Time saved: none yet. Your summit is ' + state.summit + ' hours a week.">' +
       '<div class="elev-num"><span>0</span><small>h saved</small></div>' +
-      '<div class="elev-row"><span>Summit · ' + state.summit + ' h a week, for ' + esc(state.why.toLowerCase()) + '</span></div>' +
+      '<div class="elev-row"><span>Summit · ' + state.summit + ' h a week, for ' + esc(whyText()) + '</span></div>' +
       '<p class="elev-note">Time saved starts when Sherpa is at work, after Base Camp. Only tasks Sherpa actually finishes count.</p></section>';
     // Past Base Camp: a training-log style week. Time saved against the summit, the numbers behind it, and
     // a bar for each of the last seven days. Every figure comes from tasks Sherpa actually finished.
@@ -185,8 +219,8 @@
       '<div class="row between base"><span class="wk-k">Last 7 days</span><a href="#log" class="wk-link">Trail log ' + icon('arrow', 13, MIST, 2.4) + '</a></div>' +
       '<div class="elev-num"><span>' + f1(e) + '</span><small>h saved</small></div>' +
       '<div class="wk-goal"><span class="wk-track"><span style="width:' + pct + '%"></span></span><span class="wk-pct">' + pct + '% of ' + state.summit + ' h</span></div>' +
-      '<div class="wk-stats">' + statCell('Today', tm >= 60 ? fh(tm / 60) + ' h' : tm + ' min') + statCell('Tasks', wk.length) + statCell('Camps', madeCount()) + statCell('Streak', streak() + (streak() === 1 ? ' day' : ' days')) + '</div>' +
-      daysChart(null, true) + '</section>';
+      '<div class="wk-stats">' + statCell('Today', tm >= 60 ? fh(tm / 60) + ' h' : tm + ' min') + statCell('Tasks', wk.length) + statCell('Bought back', boughtBack(e)) + statCell('Streak', streak() + (streak() === 1 ? ' day' : ' days')) + '</div>' +
+      daysChart(null, true) + (resting() ? '<p class="elev-note">Sherpa has done all it can in your camps today. Back tomorrow at 8.</p>' : '') + '</section>';
   }
   function statCell(k, v) { return '<div class="sc"><span>' + k + '</span><b>' + v + '</b></div>'; }
   // Minutes saved on each of the last seven days, oldest first.
@@ -204,12 +238,31 @@
       return '<div class="day' + (d.today ? ' is-today' : '') + '"><span class="day-bar"><span style="height:' + (d.min ? Math.max(6, Math.round(d.min / max * 100)) : 0) + '%"></span></span><span class="day-k">' + 'SMTWTFS'.charAt(d.d.getDay()) + '</span></div>';
     }).join('') + '</div>';
   }
-  // Days in a row, up to today, on which Sherpa finished something.
+  // The clear-the-trail streak: days in a row you cleared everything that needed you. Today still counts as
+  // open until it's over, so the streak doesn't break at breakfast.
+  function clearedOn(a) { return (state.cleared || []).some(function (t) { return t >= a && t < a + DAY; }); }
   function streak() {
     var n = 0, a = startOfDay();
-    while (liveDone().some(function (x) { return x.ts >= a && x.ts < a + DAY; })) { n++; a -= DAY; }
+    if (!clearedOn(a)) a -= DAY;
+    while (clearedOn(a)) { n++; a -= DAY; }
     return n;
   }
+  function markCleared() { if (climbing() && !openApprovals().length && !clearedOn(startOfDay())) state.cleared = (state.cleared || []).concat([Date.now()]); }
+  function streakLine(n) {
+    var st = streak(), today = clearedOn(startOfDay());
+    if (n) return st ? 'Clear these today to keep your ' + st + '-day streak.' : 'Clear these today to start a streak.';
+    return today ? 'Cleared today. ' + st + (st === 1 ? ' day' : ' days') + ' in a row.' : '';
+  }
+  // Buyback Rate: what an hour of your time is worth. Hours saved times that is what Sherpa bought back.
+  // What the hiker wants the time for: one reason or several, read as a phrase ("family and deep work") or a
+  // short tag for the map ("FAMILY · HEALTH +1").
+  function whyText() { return listing(state.whys.map(function (w) { return w.toLowerCase(); })); }
+  function whyTag() { var w = state.whys; return (w.slice(0, 2).join(' · ') + (w.length > 2 ? ' +' + (w.length - 2) : '')).toUpperCase(); }
+  function whyChips() {
+    return '<div class="chips" role="group" aria-label="What for">' + D.WHY.map(function (w) { return '<button type="button" class="chipbtn" aria-pressed="' + (state.whys.indexOf(w) > -1) + '" data-action="set-why" data-why="' + esc(w) + '">' + esc(w) + '</button>'; }).join('') + '</div>';
+  }
+  function money(n) { return '$' + Math.round(n).toLocaleString('en-US'); }
+  function boughtBack(h) { return money(h * (state.rate || 150)); }
   function madeOn(id) { var at = state.camps[id] && state.camps[id].at; return at > 1e11 ? new Date(at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''; }
   function lastTask(id) { return entries().filter(function (e2) { return e2.camp === id && !e2.undone; })[0]; }
   // A camp you've made, logged like a hike: what it is, when you made it, and what Sherpa has done there.
@@ -226,15 +279,17 @@
     return '<div class="appr-list">' + list.map(function (a) {
       var open = !!session.apprOpen[a.id], c = camp(a.camp);
       return '<div class="appr' + (onPine ? ' on-pine' : '') + (open ? ' is-open' : '') + '"><div class="appr-top">' +
-        '<button type="button" class="appr-text" data-action="appr-open" data-id="' + a.id + '" aria-expanded="' + open + '"><b>' + esc(a.who) + '</b><span>' + esc(a.what) + '</span></button>' +
+        '<button type="button" class="appr-text" data-action="appr-open" data-id="' + a.id + '" aria-expanded="' + open + '"><b>' + esc(a.who) + '</b><span>' + esc(a.what) + ' · <em class="wait">' + waitLabel(a) + '</em></span></button>' +
         '<span class="appr-chev" aria-hidden="true">' + icon('chev', 16, onPine ? MIST : PINE, 2.2) + '</span>' +
         '<button type="button" class="btn ' + (onPine ? 'ghost-mist' : 'ghost') + ' sm" data-action="approve" data-id="' + a.id + '">' + a.verb + '</button></div>' +
-        (open ? '<div class="appr-more"><div class="appr-kind">' + esc(a.kind) + '</div><p>' + esc(a.detail) + '</p><div class="appr-meta">' + esc(c.name) + ' · ' + esc(toolsLabel(a.camp)) + ' · saves about ' + a.min + ' min</div>' +
+        (open ? '<div class="appr-more"><div class="appr-kind">' + esc(a.kind) + '</div><p>' + esc(a.detail) + '</p>' + (a.cost ? '<p class="appr-cost">' + esc(a.cost) + '</p>' : '') + '<div class="appr-meta">' + esc(c.name) + ' · ' + esc(toolsLabel(a.camp)) + ' · saves about ' + a.min + ' min</div>' +
           '<div class="appr-acts"><button type="button" class="btn ' + (onPine ? 'ghost-mist' : 'ghost') + ' sm" data-action="reject" data-id="' + a.id + '">Reject</button>' +
           '<button type="button" class="btn ' + (onPine ? 'ghost-mist' : 'ghost') + ' sm" data-action="appr-chat" data-id="' + a.id + '">' + icon('chat', 14, onPine ? MIST : PINE, 2) + 'Chat about it</button></div></div>' : '') +
         '</div>';
     }).join('') + '</div>';
   }
+  // How long something has waited on you, counted in the demo's days.
+  function waitLabel(a) { var d = (a.waited || 0) + Math.floor((startOfDay() - startOfDay(state.baseAt || Date.now())) / DAY); return d <= 0 ? 'since this morning' : d === 1 ? 'waiting 1 day' : 'waiting ' + d + ' days'; }
   function approveAllLabel(n) { return n === 3 ? 'Approve all three' : n === 2 ? 'Approve both' : 'Approve it'; }
 
 
@@ -289,7 +344,7 @@
 
   function campDoes(c) {
     var ex = D.TRAILS.filter(function (t) { return t.camp === c.id; }).slice(0, 3);
-    return ex.length ? '<div class="label">What Sherpa can do here</div><ul class="does">' + ex.map(function (t) { return '<li>' + esc(t.title) + '</li>'; }).join('') + '</ul>' : '';
+    return ex.length ? '<div class="label">Time Assassins Sherpa can take</div><ul class="does">' + ex.map(function (t) { return '<li>' + esc(t.text) + '</li>'; }).join('') + '</ul>' : '';
   }
   // Each camp lists its usual tools plus Other. In the demo, Other is an empty placeholder: more connectors
   // would be listed there.
@@ -315,6 +370,19 @@
       '<span class="photo-pick-t">' + (state.photo ? 'Change photo' : 'Add a photo') + '</span></label>';
   }
   function guideLine(t) { return '<div class="guide-line">' + sherpaDisc(false, 40) + '<p>' + t + '</p></div>'; }
+  // The hourly-value field and Sherpa's explanation of it, which updates as you type. Your Buyback Rate (Dan
+  // Martell's) is a quarter of your hourly value: the most it's worth paying to hand an hour of work off.
+  function rateSay(v) {
+    if (!(v > 0)) return 'Not sure? Take what you earn in a year and divide it by 2,000 working hours.';
+    return money(v) + ' an hour. That makes your Buyback Rate ' + money(v / 4) + ': anything that costs less than that an hour, hand it off. Every hour I save you is ' + money(v) + ' bought back.';
+  }
+  function rateForm(kind) {
+    var v = kind === 'rate' && !state.rateSet ? '' : state.rate;
+    return '<form class="rate-form" id="' + kind + '-form" data-form="' + kind + '"><label class="sr" for="' + kind + '-in">Your hourly value in dollars</label>' +
+      '<div class="rate-field"><span>$</span><input id="' + kind + '-in" class="rate-in" name="rate" type="number" inputmode="numeric" min="1" max="100000" step="1" placeholder="200" value="' + esc(v) + '"><span>/ hour</span></div>' +
+      (session.rateError ? '<p class="err" role="alert">Add what an hour of your time is worth to keep going.</p>' : '') +
+      '<div class="guide-line rate-say">' + sherpaDisc(false, 32) + '<p data-rate-say>' + esc(rateSay(Number(v))) + '</p></div></form>';
+  }
   function startBody(step) {
     if (step === 'name') {
       return guideLine('I\'m Sherpa, your guide. I\'ll get you set up and do the work that wins your time back.') + '<h1>What\'s your name?</h1>' +
@@ -323,28 +391,41 @@
         (session.nameError ? '<p class="err" role="alert">Add your first name to keep going.</p>' : '') +
         '<div class="row gap12"><button type="submit" class="btn primary lg">Next</button><button type="button" class="btn text" data-action="step" data-to="welcome">Back</button></div></form>';
     }
+    if (step === 'industry') {
+      return '<h1>What kind of business do you run?</h1>' +
+        '<div class="inds" role="radiogroup" aria-label="Industry">' + D.INDUSTRIES.map(function (ind) {
+          return '<button type="button" class="ind" role="radio" aria-checked="' + (state.cohort === ind.id) + '" data-action="set-cohort" data-c="' + ind.id + '">' +
+            '<span class="ind-ico">' + icon(ind.icon, 18, PINE, 1.9) + '</span><b>' + esc(ind.name) + '</b></button>';
+        }).join('') + '</div>' +
+        '<div class="row gap12"><button type="button" class="btn primary lg" data-action="step" data-to="summit"' + (state.cohort ? '' : ' disabled') + '>Next</button><button type="button" class="btn text" data-action="step" data-to="name">Back</button></div>';
+    }
     if (step === 'summit') {
-      return guideLine('Nice to meet you, ' + esc(state.name) + '. Now pick your summit: the hours I\'ll win back for you each week.') + '<h1>How much time would you like to save each week?</h1>' +
+      return '<h1>How much time would you like to save each week?</h1>' +
         '<div class="stepper"><button type="button" class="round-btn" data-action="hours" data-d="-1" aria-label="Fewer hours">' + icon('minus', 20, PINE, 2.5) + '</button>' +
         '<output class="stepper-num" aria-live="polite">' + state.summit + '</output>' +
         '<button type="button" class="round-btn" data-action="hours" data-d="1" aria-label="More hours">' + icon('plus', 20, PINE, 2.5) + '</button><span class="stepper-unit">hours<br>a week</span></div>' +
-        '<div class="chips" role="group" aria-label="Quick picks">' + [5, 10, 15, 20, 30].map(function (n) { return '<button type="button" class="chipbtn" aria-pressed="' + (state.summit === n) + '" data-action="set-hours" data-n="' + n + '">' + n + ' h</button>'; }).join('') + '</div>' +
-        '<h2 class="start-h2">What do you want the extra time for?</h2><div class="chips" role="group" aria-label="What for">' + D.WHY.map(function (w) { return '<button type="button" class="chipbtn" aria-pressed="' + (state.why === w) + '" data-action="set-why" data-why="' + esc(w) + '">' + esc(w) + '</button>'; }).join('') + '</div>' +
-        '<div class="row gap12"><button type="button" class="btn primary lg" data-action="step" data-to="coords">Next</button><button type="button" class="btn text" data-action="step" data-to="name">Back</button></div>';
+        '<h2 class="start-h2">What do you want the extra time for?</h2>' + whyChips() +
+        '<div class="row gap12"><button type="button" class="btn primary lg" data-action="step" data-to="rate">Next</button><button type="button" class="btn text" data-action="step" data-to="industry">Back</button></div>';
+    }
+    if (step === 'rate') {
+      return guideLine('One more question, ' + esc(state.name) + '.') +
+        '<h1>What\'s an hour of your time worth?</h1>' + rateForm('rate', 'Next') +
+        '<div class="row gap12"><button type="submit" form="rate-form" class="btn primary lg">Next</button><button type="button" class="btn text" data-action="step" data-to="summit">Back</button></div>';
     }
     // how the climb works: the whole idea, in Sherpa's words, before the map
     var how = [
-      ['base', 'Make Base Camp', 'Pick the AI that runs me: Claude, GPT, Gemini or Llama. One is enough for now.'],
+      ['base', 'Make Base Camp', 'Pick the AI that runs me: Claude, ChatGPT, Gemini or another. One is enough for now.'],
       ['mail', 'Make your first camp', 'Connect a tool you already use, like Gmail or Slack. Each tool is a camp, and I get to work in it.'],
       ['check', 'Climb on real work', 'Every task I finish goes in your trail log with the time it would have taken you. Only finished work counts.'],
-      ['flag', 'Reach your summit', state.summit + ' hours a week, for ' + esc(state.why.toLowerCase()) + '.'],
+      ['flag', 'Reach your summit', state.summit + ' hours a week, for ' + esc(whyText()) + '.'],
       ['docs', 'Read your trail report', 'Every evening I tell you what I did, the time it saved and what\'s next.']
     ];
-    return guideLine('That\'s your goal set, ' + esc(state.name) + '. Here\'s how we get there. I\'ll walk you through each step.') + '<h1>How the climb works</h1>' +
+    return '<h1>How the climb works</h1>' +
       '<ol class="how">' + how.map(function (h, i) {
-        return '<li><span class="how-ico">' + icon(h[0], 18, PINE, 1.9) + '</span><div class="col"><b>' + (i + 1) + '. ' + h[1] + '</b><span>' + h[2] + '</span></div></li>';
+        return '<li class="how-item"><button type="button" class="how-row" data-action="how-toggle" aria-expanded="false" aria-controls="how-' + i + '"><span class="how-ico">' + icon(h[0], 18, PINE, 1.9) + '</span><b class="grow">' + (i + 1) + '. ' + h[1] + '</b><span class="how-chev">' + icon('chev', 16, PINE, 2.2) + '</span></button>' +
+          '<div class="how-body" id="how-' + i + '"><div><p>' + h[2] + '</p></div></div></li>';
       }).join('') + '</ol>' +
-      '<div class="row gap12"><button type="button" class="btn primary lg" data-action="start-climb">Start the climb</button><button type="button" class="btn text" data-action="step" data-to="summit">Back</button></div>';
+      '<div class="row gap12"><button type="button" class="btn primary lg" data-action="start-climb">Start the climb</button><button type="button" class="btn text" data-action="step" data-to="rate">Back</button></div>';
   }
   function renderStart(r) {
     var step = r.step === 'trailhead' ? 'coords' : r.step;
@@ -364,9 +445,10 @@
 
   /* ================= app screens ================= */
   function dHeader(r) {
-    var nav = [['home', 'Map'], ['camps', 'Camps'], ['log', 'Trail log']].map(function (n) {
+    var need = openApprovals().length;
+    var nav = [['home', 'Map'], ['approvals', 'Approvals'], ['camps', 'Camps'], ['log', 'Trail log'], ['leaderboard', 'Leaderboard']].map(function (n) {
       var on = r.section === n[0];
-      return '<a href="#' + n[0] + '" class="nav-link' + (on ? ' is-on' : '') + '"' + (on ? ' aria-current="page"' : '') + '>' + n[1] + '</a>';
+      return '<a href="#' + n[0] + '" class="nav-link' + (on ? ' is-on' : '') + '"' + (on ? ' aria-current="page"' : '') + '>' + n[1] + (n[0] === 'approvals' && need ? '<span class="tab-n">' + need + '</span>' : '') + '</a>';
     }).join('');
     return '<header class="d-head">' + logo(30) + '<nav class="d-nav" aria-label="Main">' + nav + '</nav><div class="row gap12">' + elevPill() +
       '<a href="#gear" class="icon-btn' + (r.section === 'gear' ? ' is-on' : '') + '" aria-label="Settings"' + (r.section === 'gear' ? ' aria-current="page"' : '') + '>' + icon('gear', 20, PINE, 2) + '</a>' + avatar() + '</div></header>';
@@ -399,9 +481,38 @@
       (guiding() && !list.length ? '' : '<p class="sp-say">' + (guiding() ? '' : greeting() + ', ' + esc(state.name) + '. ') + needsLine(list.length) + '</p>') +
       approvalRows(list, true) +
       (list.length > 1 ? '<button type="button" class="btn mist block" data-action="approve-all">' + approveAllLabel(list.length) + '</button>' : '') +
+      (streakLine(list.length) ? '<p class="sp-note streak-note">' + streakLine(list.length) + '</p>' : '') +
+      stepCard(true) +
       '<div class="label on-pine">Trail log</div><div class="mini-log">' + (recent.length ? recent.map(function (e) {
         return '<a href="#log" class="ml-row"><span class="ml-time">' + e.time + '</span><span class="grow">' + esc(e.text) + '</span><b>' + (e.undone ? 'Undone' : '+' + e.min + 'm') + '</b></a>';
       }).join('') : '<p class="sp-note">Sherpa is getting started. Every task it finishes lands here.</p>') + '</div><div class="ml-total"><span>Today so far</span><b>+' + todayMinutes() + ' min</b></div></aside>';
+  }
+
+  /* ================= today's step ================= */
+  // One thing a day only you can do, already started by Sherpa so it's a review, not a blank page. Finish it
+  // and the rest of the day is for whatever you're climbing for.
+  function stepDoneToday() { var a = startOfDay(); return D.STEPS.filter(function (st) { return (state.stepsDone[st.id] || 0) >= a; })[0]; }
+  function todayStep() {
+    if (!climbing() || !state.introSeen) return null;
+    var done = stepDoneToday(); if (done) return { step: done, done: true };
+    var open = D.STEPS.filter(function (st) { return isOn(st.camp); }).sort(function (a, b) { return (state.stepsDone[a.id] || 0) - (state.stepsDone[b.id] || 0); });
+    return open.length ? { step: open[0], done: false } : null;
+  }
+  function blockLabel(st) { var t = state.blocked[st.id]; return t && t >= startOfDay() ? st.block + ' min blocked at ' + timeOf(t) : ''; }
+  function stepCard(onPine) {
+    var ts = todayStep(); if (!ts) return '';
+    var st = ts.step, bl = blockLabel(st), cls = 'ts' + (onPine ? ' on-pine' : '');
+    if (ts.done) return '<section class="' + cls + ' is-done"><div class="ts-k">' + icon('check', 13, onPine ? MIST : PINE, 3) + 'Today\'s step done</div><b class="ts-t">' + esc(st.title) + '</b></section>';
+    return '<section class="' + cls + '" aria-label="Today\'s step"><div class="ts-k">Today\'s step</div><b class="ts-t">' + esc(st.title) + '</b><p class="ts-sub">' + esc(st.short) + '</p>' +
+      '<div class="ts-acts"><button type="button" class="btn ' + (onPine ? 'mist' : 'primary') + ' sm" data-action="step-open" data-id="' + st.id + '">Open draft</button>' +
+      '<button type="button" class="btn ' + (onPine ? 'ghost-mist' : 'ghost') + ' sm" data-action="step-block" data-id="' + st.id + '"' + (bl ? ' disabled' : '') + '>' + (bl || 'Block ' + st.block + ' min') + '</button></div></section>';
+  }
+  function stepSheet(id) {
+    var st = D.STEPS.filter(function (x) { return x.id === id; })[0], c = camp(st.camp);
+    sheet('<div class="sheet-head">' + campDisc(c, 48) + '<div class="col"><h2>' + esc(st.title) + '</h2><span class="soft">Draft by Sherpa · ' + esc(c.name) + ' · ' + esc(toolsLabel(c.id)) + '</span></div></div>' +
+      '<div class="appr-more step-draft"><div class="appr-kind">Draft</div><p>' + esc(st.draft) + '</p></div>' +
+      '<p class="soft sm">' + esc(st.started) + '</p>' +
+      '<div class="row gap8 step-sheet-acts"><button type="button" class="btn primary grow" data-action="step-done" data-id="' + st.id + '">Looks good. Done</button><button type="button" class="btn ghost" data-action="step-chat" data-id="' + st.id + '">Change it</button></div>', { label: 'Today\'s step: ' + st.title });
   }
 
   /* ================= Sherpa, the guide ================= */
@@ -451,24 +562,25 @@
     if (!reportReady()) return '';
     var tm = todayMinutes(), isNew = !session.reportShown; session.reportShown = true;
     return '<div class="rp-pop' + (isNew ? ' is-new' : '') + '" role="status"><a href="#report" class="rp-pop-main">' + sherpaDisc(true, 40) +
-      '<span class="grow col"><b>Your trail report</b><span>Ready. ' + (tm >= 60 ? f1(tm / 60) + ' h' : tm + ' min') + ' saved today.</span></span><span class="btn mist sm">Read</span></a>' +
+      '<span class="grow col"><b>Trail report ready</b><span>' + (tm >= 60 ? f1(tm / 60) + ' h' : tm + ' min') + ' saved today</span></span><span class="btn mist sm rp-read">Read</span></a>' +
       '<button type="button" class="icon-btn on-pine" data-action="report-later" aria-label="Dismiss the trail report">' + icon('close', 14, MIST, 2.5) + '</button></div>';
   }
   function renderHome(r) {
     if (desk()) {
-      return dHeader(r) + '<main class="d-grid" id="main"><aside class="d-left">' + (guiding() ? '' : reportPop()) + elevCard() + campsLink() + '</aside>' +
+      return dHeader(r) + '<main class="d-grid" id="main"><aside class="d-left">' + (guiding() ? '' : reportPop()) + elevCard() + campsLink() + boardLink() + '</aside>' +
         '<div class="d-center">' + viewPanel('home', { ask: 'Ask Sherpa' }) + '</div>' + homeSherpaPanel() + '</main>';
     }
     var n = openApprovals().length;
     if (!climbing()) return pHeader(r) + '<main class="p-main" id="main"><div class="sp-card pine">' + sherpaHead('Your guide') + guide() + '</div>' + elevCard(true) +
       viewPanel('home', { cls: 'is-preview', noExpand: true }) + '<a href="#map" class="link-row">Open the full map ' + icon('arrow', 16, PINE, 2.2) + '</a>' +
-      campsLink() + '</main>' + pTabs(r);
+      campsLink() + boardLink() + '</main>' + pTabs(r);
     return pHeader(r) + '<main class="p-main" id="main">' + (guiding() ? '<div class="sp-card pine">' + sherpaHead('Your guide') + guide() + '</div>' : reportPop()) + elevCard(true) +
-      '<a href="#approvals" class="need"><span class="need-n">' + n + '</span><span class="grow">' + (n ? 'need you' : 'All clear') + '</span><span class="btn primary sm">' + (n ? 'Review' : 'Open') + '</span></a>' +
+      stepCard(false) +
+      '<a href="#approvals" class="need"><span class="need-n">' + n + '</span><span class="grow col"><span>' + (n === 1 ? 'needs you' : n ? 'need you' : 'All clear') + '</span>' + (streakLine(n) ? '<small>' + streakLine(n) + '</small>' : '') + '</span><span class="btn primary sm">' + (n ? 'Review' : 'Open') + '</span></a>' +
       viewPanel('home', { cls: 'is-preview', noExpand: true }) +
       '<a href="#map" class="link-row">Open the full map ' + icon('arrow', 16, PINE, 2.2) + '</a>' +
       askBar('Ask Sherpa') +
-      campsLink() + '</main>' + pTabs(r);
+      campsLink() + boardLink() + '</main>' + pTabs(r);
   }
 
   function renderMap(r) {
@@ -476,13 +588,35 @@
     return pHeader(r) + '<main class="p-main p-map" id="main">' + viewPanel('home', { cls: 'is-tall', noExpand: true }) + '</main>' + pTabs(r);
   }
 
+  // Approvals is the inbox: everything that needs you comes through here. Setup while Sherpa is guiding you,
+  // today's step, a trail report that's ready, then every approval in full, longest waiting first.
+  function apprCard(a) {
+    var c = camp(a.camp), late = (a.waited || 0) >= 2;
+    return '<article class="ap" aria-label="' + esc(a.who + ': ' + a.what) + '"><div class="ap-head">' + campIco(c) +
+      '<div class="grow col"><b>' + esc(a.who) + '</b><span>' + esc(c.name) + ' · ' + esc(a.kind) + '</span></div><span class="ap-wait' + (late ? ' is-late' : '') + '">' + waitLabel(a) + '</span></div>' +
+      '<p class="ap-what">' + esc(a.what) + '</p><p class="ap-detail">' + esc(a.detail) + '</p>' + (a.cost ? '<p class="ap-cost">' + esc(a.cost) + '</p>' : '') +
+      '<div class="ap-acts"><button type="button" class="btn primary sm" data-action="approve" data-id="' + a.id + '">' + esc(a.verb) + '</button>' +
+      '<button type="button" class="btn ghost sm" data-action="reject" data-id="' + a.id + '">Reject</button>' +
+      '<button type="button" class="btn text sm" data-action="appr-chat" data-id="' + a.id + '">' + icon('chat', 14, PINE, 2) + 'Ask</button>' +
+      '<span class="grow"></span><span class="soft sm">' + a.min + ' min</span></div></article>';
+  }
   function renderApprovals(r) {
-    if (desk()) return renderHome(r);
-    var list = openApprovals();
-    return pHeader(r) + '<main class="p-main" id="main"><h1>' + (list.length ? list.length + ' need you' : 'All clear') + '</h1>' +
-      (list.length ? approvalRows(list, false) : '<p class="lede">Nothing needs you. Sherpa will call if that changes.</p>') +
-      (list.length > 1 ? '<button type="button" class="btn primary block lg" data-action="approve-all">' + approveAllLabel(list.length) + '</button>' : '') +
-      '</main>' + pTabs(r);
+    var list = openApprovals().slice().sort(function (a, b) { return (b.waited || 0) - (a.waited || 0); }), n = list.length;
+    var a0 = startOfDay(), handled = entries().filter(function (e) { return e.ts >= a0 && /^a\d/.test(e.id); });
+    var rejected = arrivedApprovals().filter(function (a) { return state.rejected[a.id]; }).length;
+    var ts = todayStep(), extra = (guiding() ? '<div class="sp-card pine">' + sherpaHead('Your guide') + guide() + '</div>' : '') +
+      (ts && !ts.done ? stepCard(false) : '') +
+      (reportReady() ? '<a href="#report" class="camps-link"><span class="lb-trophy">' + icon('docs', 16, MIST, 2) + '</span><span class="grow col"><b>Trail report ready</b><span>' + (todayMinutes() >= 60 ? f1(todayMinutes() / 60) + ' h' : todayMinutes() + ' min') + ' saved today</span></span>' + icon('arrow', 18, PINE, 2.2) + '</a>' : '');
+    var body = '<div class="ap-top"><div class="col"><h1>' + (n ? n + ' need' + (n === 1 ? 's' : '') + ' you' : 'All clear') + '</h1>' +
+      (streakLine(n) ? '<p class="soft">' + streakLine(n) + '</p>' : '') + '</div>' +
+      (n > 1 ? '<button type="button" class="btn primary" data-action="approve-all">Approve all ' + n + '</button>' : '') + '</div>' +
+      (extra ? '<div class="ap-extra">' + extra + '</div>' : '') +
+      (n ? '<div class="ap-list">' + list.map(apprCard).join('') + '</div>' : '<p class="lede">' + (climbing() ? (madeCount() ? 'Nothing needs you right now. New things land here as Sherpa works.' : 'Connect a camp and anything that needs you lands here.') : 'Make Base Camp and anything that needs you lands here.') + '</p>') +
+      (handled.length || rejected ? '<div class="label">Handled today</div><div class="mini-log ap-done">' + handled.map(function (e) {
+        return '<div class="ml-row"><span class="ml-time">' + e.time + '</span><span class="grow">' + esc(e.text) + '</span><b>' + (e.undone ? 'Undone' : '+' + e.min + 'm') + '</b></div>';
+      }).join('') + (rejected ? '<p class="soft sm">' + rejected + ' rejected. Nothing went out.</p>' : '') + '</div>' : '');
+    if (desk()) return dHeader(r) + '<main class="d-page ap-page" id="main">' + body + '</main>';
+    return pHeader(r) + '<main class="p-main ap-page" id="main">' + body + '</main>' + pTabs(r);
   }
 
   // Your camps, logged like hikes, then the ones still to connect.
@@ -491,11 +625,62 @@
     if (desk()) return dHeader(r) + '<main class="d-page camps-page" id="main">' + body + '</main>';
     return pHeader(r) + '<main class="p-main camps-page" id="main">' + body + '</main>' + pTabs(r);
   }
+  /* ================= leaderboard ================= */
+  // Every hiker ranked by elevation gained: hours saved this week, or since they started. The other hikers are
+  // example people. You only appear once you join; until then the board shows where you would rank.
+  function allTimeHours() { return r1(liveDone().reduce(function (a, d) { return a + d.min; }, 0) / 60); }
+  // Three boards: your mastermind (a few peers you invited), businesses like yours, and everyone.
+  function board(range, view) {
+    var me = { me: true, name: state.name || 'You', place: 'You', type: state.cohort, week: elevation(), all: allTimeHours(), summits: state.summits || 0, streak: streak() };
+    var key = range === 'all' ? 'all' : 'week', pool = D.HIKERS;
+    if (view === 'crew') pool = D.HIKERS.filter(function (h) { return h.type === state.cohort; }).slice(0, 6);
+    else if (view === 'like') pool = D.HIKERS.filter(function (h) { return h.type === state.cohort; });
+    var list = pool.concat([me]).sort(function (a, b) { return b[key] - a[key]; });
+    list.forEach(function (h, i) { h.rank = i + 1; });
+    return { list: list, me: me, key: key, myRank: me.rank };
+  }
+  function boardRow(h, key) {
+    return '<li class="lb-row' + (h.me ? ' is-me' : '') + '"><span class="lb-rank">' + h.rank + '</span>' +
+      '<span class="lb-av' + (h.me && state.photo ? ' has-photo' : '') + '">' + (h.me ? face() : esc(h.name.charAt(0))) + '</span>' +
+      '<span class="grow col"><b>' + esc(h.me ? h.name + ' (you)' : h.name) + '</b><span>' + (h.me ? '' : esc(h.place) + ' · ') + h.summits + ' summit' + (h.summits === 1 ? '' : 's') + ' · ' + h.streak + '-day streak</span></span>' +
+      '<b class="lb-h num">' + f1(h[key]) + ' h</b></li>';
+  }
+  // A full-time assistant works about 40 hours a week: the clearest way to say what the hours are worth.
+  function eaLine(h) { var p = Math.round(h / 40 * 100); return p >= 100 ? 'More than a full-time assistant\'s week' : p + '% of a full-time assistant\'s week'; }
+  function renderBoard(r) {
+    var range = session.board || 'week', view = session.boardView || 'crew', joined = !!state.onBoard, co = industry();
+    var body = '<h1>Leaderboard</h1>';
+    if (state.hideRanks) {
+      body += '<p class="lede">Rankings are off. Your climb, nobody else\'s.</p><div class="lb-you"><div class="col"><span class="soft sm">This week</span><b class="stat">' + f1(elevation()) + ' h</b><span class="soft sm">' + eaLine(elevation()) + '</span></div>' +
+        '<button type="button" class="btn primary sm" data-action="toggle-ranks">Show rankings</button></div>';
+    } else {
+      var b = board(range, view), top = b.list.filter(function (h) { return h.me ? joined : true; });
+      top.forEach(function (h, i) { h.rank = i + 1; });
+      var shown = top.slice(0, 20);
+      body += '<p class="lede">Hikers ranked by elevation gained: the hours Sherpa bought back for them.</p>' +
+        '<div class="lb-you"><div class="col"><span class="soft sm">' + (joined ? 'Your rank' : 'You\'d rank') + '</span><b class="stat">#' + b.myRank + '</b><span class="soft sm">of ' + b.list.length + ' · ' + f1(b.me[b.key]) + ' h ' + (range === 'all' ? 'all time' : 'this week') + '</span><span class="soft sm">' + eaLine(elevation()) + '</span></div>' +
+        '<button type="button" class="btn ' + (joined ? 'ghost' : 'primary') + ' sm" data-action="board-join">' + (joined ? 'Leave the board' : 'Join the board') + '</button></div>' +
+        '<div class="seg wide" role="group" aria-label="Who">' + [['crew', 'Mastermind'], ['like', co.plural], ['all', 'Everyone']].map(function (v) { return '<button type="button" data-action="board-view" data-v="' + v[0] + '" aria-pressed="' + (view === v[0]) + '">' + v[1] + '</button>'; }).join('') + '</div>' +
+        '<div class="seg wide lb-range" role="group" aria-label="Range"><button type="button" data-action="board-range" data-range="week" aria-pressed="' + (range === 'week') + '">This week</button><button type="button" data-action="board-range" data-range="all" aria-pressed="' + (range === 'all') + '">All time</button></div>' +
+        (view === 'crew' ? '<div class="row between lb-crew"><span class="soft sm">Your mastermind: peers you invited. They keep you honest.</span><button type="button" class="btn ghost sm" data-action="board-invite">Invite</button></div>' : '') +
+        '<ol class="lb">' + shown.map(function (h) { return boardRow(h, b.key); }).join('') + '</ol>' +
+        (joined && b.myRank > 20 ? '<div class="lb-gap" aria-hidden="true">···</div><ol class="lb">' + boardRow(b.me, b.key) + '</ol>' : '') +
+        '<p class="fine">Demo. The other hikers are example people. ' + (joined ? 'Others see your first name, hours, summits and streak. Never your work or your Buyback Rate.' : 'Join to show your first name, hours, summits and streak. Never your work or your Buyback Rate.') + ' You can turn rankings off in Settings.</p>';
+    }
+    if (desk()) return dHeader(r) + '<main class="d-page narrow" id="main">' + body + '</main>';
+    return pHeader(r) + '<main class="p-main" id="main">' + body + '</main>' + pTabs(r);
+  }
+  function boardLink() {
+    if (state.hideRanks) return '';
+    var b = board('week', 'crew');
+    return '<a href="#leaderboard" class="camps-link"><span class="lb-trophy">' + icon('flag', 18, MIST, 2) + '</span><span class="grow col"><b>Leaderboard</b><span>' + (state.onBoard ? '#' + b.myRank + ' in your mastermind this week' : 'See how you rank') + '</span></span>' + icon('arrow', 18, PINE, 2.2) + '</a>';
+  }
+
   // On Home, one line that leads to the Camps page.
   function campsLink() {
     var n = madeCount(), names = madeNames();
-    return '<a href="#camps" class="camps-link">' + (n ? '<span class="cl-icos">' + D.CAMPS.filter(function (c) { return isOn(c.id); }).slice(0, 4).map(function (c) { return campIco(c); }).join('') + '</span>' : '') +
-      '<span class="grow col"><b>Your camps</b><span>' + (n ? esc(listing(names.length > 2 ? [names[0], names[1], (names.length - 2) + ' more'] : names)) : 'Connect your first camp') + '</span></span>' + icon('arrow', 18, PINE, 2.2) + '</a>';
+    return '<a href="#camps" class="camps-link">' + (n ? '<span class="cl-icos">' + D.CAMPS.filter(function (c) { return isOn(c.id); }).slice(0, 3).map(function (c) { return campIco(c); }).join('') + '</span>' : '') +
+      '<span class="grow col"><b>Your camps</b><span>' + (!n ? 'Connect your first camp' : n > 2 ? n + ' connected' : esc(listing(names))) + '</span></span>' + icon('arrow', 18, PINE, 2.2) + '</a>';
   }
 
   function permGroup(c) {
@@ -609,10 +794,12 @@
       }).join('') + '</div>' +
       '<div class="label">Your photo</div><div class="row gap12 base">' + photoPick(56) + (state.photo ? '<button type="button" class="btn text" data-action="photo-remove">Remove</button>' : '') + '</div>' +
       '<div class="label">Your name</div><form class="row gap8" data-form="rename"><label class="sr" for="gear-name">Your first name</label><input id="gear-name" class="input grow" type="text" value="' + esc(state.name) + '" autocomplete="given-name"><button type="submit" class="btn ghost">Save</button></form>' +
-      '<div class="label">Your summit</div><div class="row base gap8"><span class="stat">' + state.summit + ' h</span><span class="soft">a week, for ' + esc(state.why.toLowerCase()) + '</span></div><div class="chips">' + [-5, 5].map(function (d) { return '<button type="button" class="chipbtn" data-action="gear-summit" data-d="' + d + '">' + (d > 0 ? '+' : '') + d + ' h</button>'; }).join('') + '</div>' +
-      '<div class="label">Demo</div><button type="button" class="btn ghost" data-action="intro-replay">Watch the intro again</button>' + (session.confirmReset ?
-        '<p>Start over? This clears your name, summit, camps and trail log on this device.</p><div class="row gap8"><button type="button" class="btn primary" data-action="reset">Start over</button><button type="button" class="btn ghost" data-action="reset-cancel">Keep my climb</button></div>' :
-        '<button type="button" class="btn ghost" data-action="reset-ask">Start over</button>');
+      '<div class="label">Your summit</div><div class="row base gap8"><span class="stat">' + state.summit + ' h</span><span class="soft">a week, for ' + esc(whyText()) + '</span></div><div class="chips">' + [-5, 5].map(function (d) { return '<button type="button" class="chipbtn" data-action="gear-summit" data-d="' + d + '">' + (d > 0 ? '+' : '') + d + ' h</button>'; }).join('') + '</div>' +
+      '<div class="label">What it\'s for</div>' + whyChips() +
+      '<div class="label">Your hourly value</div><p class="soft">Only you see it.</p>' + rateForm('gear-rate') + '<button type="submit" form="gear-rate-form" class="btn ghost">Save</button>' +
+      '<div class="label">Your industry</div><p class="soft">Shapes your map and camps.</p><div class="chips">' + D.INDUSTRIES.map(function (c) { return '<button type="button" class="chipbtn" aria-pressed="' + (state.cohort === c.id) + '" data-action="set-cohort" data-c="' + c.id + '">' + esc(c.name) + '</button>'; }).join('') + '</div>' +
+      '<div class="label">Leaderboard</div><div class="row between gap12"><span class="soft">' + (state.hideRanks ? 'Rankings are off. You only see your own climb.' : 'Rankings are on.') + '</span><button type="button" class="btn ghost sm" data-action="toggle-ranks">' + (state.hideRanks ? 'Show rankings' : 'Hide rankings') + '</button></div>' +
+      '<div class="label">Demo</div><div class="row gap8 wrap"><button type="button" class="btn ghost" data-action="skip-day"' + (climbing() ? '' : ' disabled') + '>Skip ahead a day</button><button type="button" class="btn ghost" data-action="intro-replay">Watch the intro again</button><button type="button" class="btn ghost" data-action="reset">Start over</button></div>';
     if (desk()) return dHeader(r) + '<main class="d-page narrow" id="main">' + body + '</main>';
     return pHeader(r) + '<main class="p-main" id="main">' + body + '</main>' + pTabs(r);
   }
@@ -640,7 +827,7 @@
     var opts = [[hrs + 5, 'The next ridge'], [hrs + 10, 'The high pass'], [hrs, 'Stay here']];
     if (!nextPick) nextPick = opts[0][0];
     var body = '<div class="summit-wrap">' + award(hrs, state.name, n) +
-      (reached ? '<h1>You made the summit</h1><p class="lede">' + hrs + ' hours saved a week, for ' + esc(state.why.toLowerCase()) + '.</p>' +
+      (reached ? '<h1>You made the summit</h1><p class="lede">' + hrs + ' hours saved a week, for ' + esc(whyText()) + '.</p>' +
         '<div class="label">Your next summit</div><div class="tiles3" role="radiogroup" aria-label="Next summit">' + opts.map(function (o, i) {
           var val = i === 2 ? 'hold' : o[0];
           return '<button type="button" class="tile-radio" role="radio" aria-checked="' + (String(nextPick) === String(val)) + '" data-action="next-pick" data-v="' + val + '"><b>' + (i === 2 ? 'Hold' : o[0] + ' h') + '</b><span>' + (i === 2 ? 'at ' + hrs + ' h saved' : 'saved a week') + '</span><small>' + o[1] + '</small></button>';
@@ -678,8 +865,9 @@
     return out;
   }
   function world(n) {
-    if (worlds[n]) return worlds[n];
-    var r = rng(seedOf('apex-mountain-' + n)), cx = MW / 2, side = r() < 0.5 ? -1 : 1;
+    var wk = n + '-' + state.cohort;
+    if (worlds[wk]) return worlds[wk];
+    var r = rng(seedOf('apex-mountain-' + n + '-' + state.cohort)), cx = MW / 2, side = r() < 0.5 ? -1 : 1;
     var summit = [cx + (r() - 0.5) * 640, 250 + r() * 120];
     var base = [cx + (r() - 0.5) * 360, 1880 + r() * 120];
     // The trailhead sits below everything else on the map: the lowest point of the climb.
@@ -776,8 +964,8 @@
     var terrain = '<rect x="-6000" y="-6000" width="' + (MW + 12000) + '" height="' + (MH + 12000) + '" fill="' + MIST + '"/>' +
       '<path d="' + thin.join('') + '" fill="none" stroke="' + PINE + '" stroke-opacity="0.13" stroke-width="1" vector-effect="non-scaling-stroke"/>' +
       '<path d="' + thick.join('') + '" fill="none" stroke="' + PINE + '" stroke-opacity="0.26" stroke-width="1.2" vector-effect="non-scaling-stroke"/>';
-    worlds[n] = { n: n, pts: pts, sides: sides, trailhead: trailhead, base: base, summit: summit, setupPts: setupPts, setupSegs: setupSegs, climb: climb, spur: spur, crop: crop, approach: approach, terrain: terrain };
-    return worlds[n];
+    worlds[wk] = { n: wk, pts: pts, sides: sides, trailhead: trailhead, base: base, summit: summit, setupPts: setupPts, setupSegs: setupSegs, climb: climb, spur: spur, crop: crop, approach: approach, terrain: terrain };
+    return worlds[wk];
   }
 
   var measure = null;
@@ -900,7 +1088,7 @@
     var sm = w.summit, top = !pre && !still && e >= state.summit;
     s.push(mk('summit', '', 'Summit, ' + state.summit + ' hours a week') + '<circle cx="' + r1(sm[0]) + '" cy="' + r1(sm[1]) + '" r="' + r1(26 * k) + '" fill="' + (top ? PINE : MIST) + '" stroke="' + PINE + '" stroke-dasharray="' + (top ? '0' : r1(4 * k) + ' ' + r1(4 * k)) + '" stroke-width="' + r1(2 * k) + '"/>' +
       '<image href="assets/' + (top ? 'icon-white.svg' : 'icon.svg') + '" x="' + r1(sm[0] - 11 * k) + '" y="' + r1(sm[1] - 12.5 * k) + '" width="' + r1(22 * k) + '" height="' + r1(23.8 * k) + '"/>' +
-      labelAt(sm, sm[0] < MW / 2 ? 'right' : 'left', 26, k, [{ t: 'SUMMIT · ' + state.summit + ' H', size: 13 }, { t: state.why.toUpperCase() + ((state.mapN || 1) > 1 ? ' · MOUNTAIN ' + state.mapN : ''), size: 11, w: 600, o: 0.72 }]) + '</g>');
+      labelAt(sm, sm[0] < MW / 2 ? 'right' : 'left', 26, k, [{ t: 'SUMMIT · ' + state.summit + ' H', size: 13 }, { t: whyTag() + ((state.mapN || 1) > 1 ? ' · MOUNTAIN ' + state.mapN : ''), size: 11, w: 600, o: 0.72 }]) + '</g>');
     // you: a map pin whose tip marks your spot, with your photo (or the climber) in its head. At the trailhead
     // it stands on top of the trailhead marker.
     if (!still) {
@@ -1200,7 +1388,7 @@
       return isOn(c.id) ? c.name + ' is connected with ' + toolsLabel(c.id) + '.' : 'This is ' + c.name + '. Here I can ' + (ex ? ex.title.charAt(0).toLowerCase() + ex.title.slice(1) : 'take work off your plate') + ', and more. Connect it now, or later?';
     }
     if (st.id === 'brain') return 'This is the Brain view: another way to view your AI brain. Switch between Map and Brain any time.';
-    return 'Every hour I save you is an hour of elevation gained. Make it to the summit and you\'ve won back ' + state.summit + ' hours of freedom, every week.';
+    return 'Every minute I save you is a minute of elevation gained. Make it to the summit and you\'ve won back ' + state.summit + ' hours of freedom, every week.';
   }
   // The choices under Sherpa's line: an AI for Base Camp, a tool for a camp.
   function introActs(st) {
@@ -1380,8 +1568,12 @@
   var handlers = {
     'step': function (el) { state.step = el.dataset.to; save(); go('start-' + el.dataset.to); },
     'hours': function (el) { state.summit = clamp(state.summit + Number(el.dataset.d), 1, 60); save(); render(); },
-    'set-hours': function (el) { state.summit = Number(el.dataset.n); save(); render(); },
-    'set-why': function (el) { state.why = el.dataset.why; save(); render(); },
+    'set-why': function (el) {
+      var w = el.dataset.why, i = state.whys.indexOf(w);
+      if (i > -1) { if (state.whys.length === 1) { toast('Keep at least one reason.'); return; } state.whys.splice(i, 1); }
+      else state.whys = D.WHY.filter(function (x) { return x === w || state.whys.indexOf(x) > -1; });
+      save(); render();
+    },
     'pick-tool': function (el) { session.pendingTool[el.dataset.camp] = el.dataset.tool; var sc = $('.scrim'); if (sc) { var box = $('.connect', sc); if (box) { box.outerHTML = connectBlock(camp(el.dataset.camp)); return; } } render(); },
     'connect': function (el) { if (session.connecting) return; connectCamp(el.dataset.camp); },
     'model': function (el) {
@@ -1401,10 +1593,48 @@
       if (intro.i < introSteps().length - 1) introShow(intro.i + 1); else introEnd();
     },
     'intro-skip': function () { introEnd(); },
+    'step-open': function (el) { stepSheet(el.dataset.id); },
+    'step-block': function (el) {
+      var st = D.STEPS.filter(function (x) { return x.id === el.dataset.id; })[0], d = new Date(); d.setMinutes(d.getMinutes() < 30 ? 30 : 60, 0, 0);
+      state.blocked[st.id] = d.getTime(); save(); toast(st.block + ' minutes blocked at ' + timeOf(d.getTime()) + '. I\'ll hold your pings until it\'s done.'); render();
+    },
+    'step-done': function (el) {
+      var st = D.STEPS.filter(function (x) { return x.id === el.dataset.id; })[0], before = elevation(), now = Date.now();
+      state.stepsDone[st.id] = now; state.done.push({ id: 's' + now, ts: now, text: st.log, camp: st.camp, min: st.saved, src: 'tool' }); save(); closeSheet();
+      if (crossSummit(before)) return;
+      toast('Done. The rest of today is for ' + whyText() + '.'); render();
+    },
+    'step-chat': function (el) {
+      var st = D.STEPS.filter(function (x) { return x.id === el.dataset.id; })[0];
+      session.chatAbout = null; session.chat = [{ who: 'sherpa', text: 'Tell me what to change in "' + st.title.toLowerCase() + '" and I\'ll redo the draft.' }]; chatSheet();
+    },
+    'skip-day': function () {
+      // Demo: everything moves back a day, so a new day starts with fresh work, approvals and a new step.
+      var sh = function (t) { return t ? t - DAY : t; };
+      state.done.forEach(function (d) { d.ts -= DAY; });
+      state.baseAt = sh(state.baseAt); state.cleared = (state.cleared || []).map(sh);
+      Object.keys(state.camps).forEach(function (k) { state.camps[k].at = sh(state.camps[k].at); });
+      Object.keys(state.stepsDone).forEach(function (k) { state.stepsDone[k] = sh(state.stepsDone[k]); });
+      Object.keys(state.blocked).forEach(function (k) { state.blocked[k] = sh(state.blocked[k]); });
+      if (state.reportRead) state.reportRead.at = sh(state.reportRead.at);
+      state.approvals = {}; state.rejected = {}; state.nextAt = Date.now() + 3000; save();
+      toast('A new day. Sherpa is back at work.'); go('home');
+    },
+    'set-cohort': function (el) {
+      state.cohort = el.dataset.c; applyIndustry(); save();
+      if (state.onboarded) toast('Your map is now set up for ' + industry().plural.toLowerCase() + '.');
+      render();
+    },
+    'toggle-ranks': function () { state.hideRanks = !state.hideRanks; save(); render(); },
+    'board-view': function (el) { session.boardView = el.dataset.v; render(); },
+    'board-invite': function () { toast('Invite link copied. Anyone you send it to joins your mastermind. (Demo)'); },
+    'how-toggle': function (el) { var li = el.closest('.how-item'), open = !li.classList.contains('is-open'); li.classList.toggle('is-open', open); el.setAttribute('aria-expanded', String(open)); },
+    'board-range': function (el) { session.board = el.dataset.range; render(); },
+    'board-join': function () { state.onBoard = !state.onBoard; save(); toast(state.onBoard ? 'You\'re on the leaderboard.' : 'You\'ve left the leaderboard.'); render(); },
     'intro-ai': function (el) {
       state.models = [el.dataset.model]; state.baseAt = Date.now(); state.done = []; state.cursor = 0; save();
       var st = introSteps()[intro.i]; introButtons(st); introRedraw();
-      introType('Base Camp is up, running on ' + el.dataset.model + '. Now let\'s give me some work to do.');
+      introType('Base Camp is up, running on ' + modelsLabel() + '. Now let\'s give me some work to do.');
       clearTimeout(intro.next); intro.next = setTimeout(function () { if ($('.intro-say')) introShow(intro.i + 1); }, 2600);
     },
     'intro-tool': function (el) {
@@ -1440,7 +1670,7 @@
     },
     'go': function (el) { go(el.dataset.to); },
     'toast': function (el) { toast(el.dataset.msg); },
-    'summit': function () { if (!state.onboarded) { toast('Your summit: ' + state.summit + ' h a week, for ' + state.why.toLowerCase() + '.'); return; } if (elevation() >= state.summit) go('summit'); else toast('Summit: ' + state.summit + ' h a week. ' + fh(toGo()) + ' to go.'); },
+    'summit': function () { if (!state.onboarded) { toast('Your summit: ' + state.summit + ' h a week, for ' + whyText() + '.'); return; } if (elevation() >= state.summit) go('summit'); else toast('Summit: ' + state.summit + ' h a week. ' + fh(toGo()) + ' to go.'); },
     'approve': function (el) {
       var a = apprOf(el.dataset.id), inChat = !!el.closest('.chat-sheet');
       if (inChat) session.chat.push({ who: 'sherpa', text: 'Done. ' + a.log + '.' });
@@ -1473,12 +1703,10 @@
     'close-sheet-go': function (el) { closeSheet(); go(el.dataset.to); },
     'checkin': function () { checkin(); },
     'checkin-text': function () { closeSheet(); toast("Okay. I'll text you the short version."); },
-    'checkin-answer': function () { closeSheet(); go(desk() ? 'home' : 'approvals'); },
+    'checkin-answer': function () { closeSheet(); go('approvals'); },
     'memory': function (el) { memorySheet(el.dataset.name, el.dataset.group, el.dataset.camp); },
     'gear-summit': function (el) { state.summit = clamp(state.summit + Number(el.dataset.d), 1, 60); save(); render(); },
-    'reset-ask': function () { session.confirmReset = true; render(); },
-    'reset-cancel': function () { session.confirmReset = false; render(); },
-    'reset': function () { try { localStorage.removeItem(KEY); } catch (e) { } state = fresh(); session.confirmReset = false; session.chat = []; session.chatAbout = null; session.snoozed = {}; session.cam = {}; session.mapVB = {}; brainCache = {}; go('start-welcome'); },
+    'reset': function () { try { localStorage.removeItem(KEY); } catch (e) { } state = fresh(); session.chat = []; session.chatAbout = null; session.snoozed = {}; session.cam = {}; session.mapVB = {}; brainCache = {}; go('start-welcome'); },
     'next-pick': function (el) { nextPick = el.dataset.v === 'hold' ? 'hold' : Number(el.dataset.v); render(); },
     'next-set': function () {
       state.summits = (state.summits || 0) + 1; state.reached = state.summit;
@@ -1496,7 +1724,7 @@
   };
   // Rejecting saves no time and nothing goes out. Sherpa remembers it, so the next one is closer.
   function doReject(a, quiet) {
-    state.rejected[a.id] = true; session.apprOpen[a.id] = false; save();
+    state.rejected[a.id] = true; session.apprOpen[a.id] = false; markCleared(); save();
     if (!quiet) toast('Rejected. ' + a.no);
     render();
   }
@@ -1506,9 +1734,10 @@
       state.approvals[a.id] = true;
       state.done.push({ id: 'a' + now + a.id, ts: now + i, text: a.log, camp: a.camp, min: a.min, src: a.src });
     });
-    save();
+    markCleared(); save();
     if (crossSummit(before)) return;
-    toast(list.length === 1 ? list[0].who + ': done. +' + list[0].min + ' min saved.' : 'All clear. +' + list.reduce(function (s, a) { return s + a.min; }, 0) + ' min saved.');
+    var st = !openApprovals().length && streak();
+    toast((list.length === 1 ? list[0].who + ': done. +' + list[0].min + ' min saved.' : 'All clear. +' + list.reduce(function (s, a) { return s + a.min; }, 0) + ' min saved.') + (st ? ' Trail clear, ' + st + (st === 1 ? ' day' : ' days') + ' in a row.' : ''));
     render();
   }
 
@@ -1530,7 +1759,13 @@
     if (kind === 'name') {
       var v = f.elements.name.value.trim();
       if (!v) { session.nameError = true; render(); var i = $('#you-name'); if (i) i.focus(); return; }
-      session.nameError = false; state.name = v.slice(0, 24); state.step = 'summit'; save(); go('start-summit');
+      session.nameError = false; state.name = v.slice(0, 24); state.step = 'industry'; save(); go('start-industry');
+    } else if (kind === 'rate') {
+      var r0 = Math.round(Number(f.elements.rate.value));
+      if (!(r0 > 0)) { session.rateError = true; render(); var ri = $('#rate-in'); if (ri) ri.focus(); return; }
+      session.rateError = false; state.rate = r0; state.rateSet = true; state.step = 'coords'; save(); go('start-coords');
+    } else if (kind === 'gear-rate') {
+      var r1v = Math.round(Number(f.elements.rate.value)); if (r1v > 0) { state.rate = r1v; state.rateSet = true; save(); toast('Saved. ' + money(r1v) + ' an hour.'); render(); }
     } else if (kind === 'rename') {
       var n = $('#gear-name').value.trim(); if (n) { state.name = n.slice(0, 24); save(); toast('Got it, ' + state.name + '.'); render(); }
     } else if (kind === 'ask') {
@@ -1559,6 +1794,7 @@
     img.src = url;
   });
   document.addEventListener('input', function (e) {
+    if (e.target.classList && e.target.classList.contains('rate-in')) { var say = $('[data-rate-say]', e.target.form); if (say) say.textContent = rateSay(Number(e.target.value)); return; }
     if (e.target.id === 'log-q') {
       session.logQuery = e.target.value; var pos = e.target.selectionStart;
       render(); var i = $('#log-q'); if (i) { i.focus(); try { i.setSelectionRange(pos, pos); } catch (er) { } }
@@ -1583,6 +1819,7 @@
                   r.name === 'log' ? renderLog(r) :
                     r.name === 'report' ? renderReport(r) :
                       r.name === 'gear' ? renderGear(r) :
+                        r.name === 'leaderboard' ? renderBoard(r) :
                         renderSummit(r);
     var changed = session.last !== r.hash;
     app.className = 'app ' + (desk() ? 'is-desk' : 'is-phone') + ' r-' + (introNow ? 'intro' : r.name);
@@ -1602,16 +1839,23 @@
     session.dirty = false; render();
   }
   function tick() {
-    var before = elevation(), n = work(Date.now());
-    if (n) { save(); if (state.done.length === n) toast('Sherpa finished its first task. Time saved starts now.'); if (crossSummit(before)) return; }
+    var before = elevation(), had = openApprovals().map(function (a) { return a.id; }), n = work(Date.now());
+    if (n) {
+      save();
+      var fresh = openApprovals().filter(function (a) { return had.indexOf(a.id) < 0; });
+      if (state.done.length === n) toast('Sherpa finished its first task. Time saved starts now.');
+      else if (fresh.length) toast(fresh.length === 1 ? fresh[0].who + ' needs you.' : words(fresh.length) + ' new things need you.');
+      if (crossSummit(before)) return;
+    }
     if (n || session.dirty) liveRender();
   }
   function titleFor(r) {
-    return { start: 'Setup', home: 'Home', map: 'Map', approvals: 'Approvals', camps: 'Camps', camp: r.camp ? camp(r.camp).name : 'Camp', log: 'Trail log', report: 'Trail report', gear: 'Settings', summit: 'Summit' }[r.name];
+    return { start: 'Setup', leaderboard: 'Leaderboard', home: 'Home', map: 'Map', approvals: 'Approvals', camps: 'Camps', camp: r.camp ? camp(r.camp).name : 'Camp', log: 'Trail log', report: 'Trail report', gear: 'Settings', summit: 'Summit' }[r.name];
   }
 
   function boot() {
     app = $('#app');
+    applyIndustry();
     window.addEventListener('hashchange', render);
     if (deskMQ.addEventListener) deskMQ.addEventListener('change', render); else if (deskMQ.addListener) deskMQ.addListener(render);
     render();
