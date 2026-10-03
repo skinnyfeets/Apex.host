@@ -14,7 +14,6 @@
   function fh(n) { var v = r1(n); return v % 1 === 0 ? String(v) : v.toFixed(1); }
   function words(n) { return ['No', 'One', 'Two', 'Three', 'Four', 'Five'][n] || String(n); }
   function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
-  function nowTime() { var d = new Date(); return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); }
   function greeting() { var h = new Date().getHours(); return h < 12 ? 'Morning' : h < 18 ? 'Afternoon' : 'Evening'; }
   function monthTag() { return ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'][new Date().getMonth()] + ' ' + new Date().getFullYear(); }
 
@@ -115,9 +114,6 @@
   function sourceOf(entry) {
     if (entry.camp === 'mail') { var g = toolsOf('mail').indexOf('Gmail') > -1 || !toolsOf('mail').length; return entry.src === 'cal' ? (g ? 'Google Calendar' : 'Outlook') : (g ? 'Gmail' : toolOf('mail')); }
     return toolOf(entry.camp);
-  }
-  function trailHours(campId) {
-    var h = 0; D.TRAILS.forEach(function (t) { if (t.camp === campId && state.trails[t.id] === 'taken') h += t.hours; }); return h;
   }
   /* Time saved. Nothing counts until Base Camp. After that only finished tasks count, each one the time it
      would otherwise have taken you. Elevation is the time saved in the last seven days. */
@@ -247,9 +243,9 @@
   function campDisc(c, size, dashed) { return '<span class="cdisc' + (dashed ? ' is-dashed' : '') + '" style="width:' + size + 'px;height:' + size + 'px">' + icon(c.icon, Math.round(size * 0.46), PINE, 1.8) + '</span>'; }
 
   function elevCard(compact) {
-    if (!climbing()) return '<section class="elev" aria-label="Time saved: none yet. Your summit is ' + state.summit + ' hours a week.">' +
+    if (!climbing()) return '<section class="elev" aria-label="Time saved: none yet. Your first peak is ' + state.summit + ' hours a week.">' +
       '<div class="elev-num"><span>0</span><small>h saved</small></div>' +
-      '<div class="elev-row"><span>Summit · ' + state.summit + ' h a week, for ' + esc(whyText()) + '</span></div>' +
+      '<div class="elev-row"><span>First peak · ' + state.summit + ' h a week, for ' + esc(whyText()) + '</span></div>' +
       '<p class="elev-note">Time saved starts when Sherpa is at work, after Base Camp. Only tasks Sherpa actually finishes count.</p></section>';
     // Past Base Camp: a training-log style week. Time saved against the summit, the numbers behind it, and
     // a bar for each of the last seven days. Every figure comes from tasks Sherpa actually finished.
@@ -559,7 +555,7 @@
   // task it finishes, then your first trail report. Once all five are done the guide steps aside.
   function guideSteps() {
     return [
-      { id: 'summit', t: 'Set your summit', done: true },
+      { id: 'summit', t: 'Pick your first peak', done: true },
       { id: 'base', t: 'Make Base Camp', done: climbing() },
       { id: 'camp', t: 'Make your first camp', done: madeCount() > 0 },
       { id: 'work', t: 'Sherpa finishes a task', done: climbing() && madeCount() > 0 && liveDone().length > 0 },
@@ -814,7 +810,7 @@
     var maxT = Math.max.apply(null, on.map(function (c) { return minToday(c.id); }).concat([1]));
     var body = '<article class="report"><header class="rp-head">' + sherpaDisc(false, 44) + '<div class="grow col"><b>Trail report</b><span class="soft">' + WEEKDAYS[new Date().getDay()] + '. A new one every evening.</span></div>' +
       '<a href="#log" class="icon-btn" aria-label="Close">' + icon('close', 16, PINE, 2.5) + '</a></header>' +
-      '<div class="rp-hero"><span>' + (tm >= 60 ? f1(tm / 60) : tm) + '</span><b>' + (tm >= 60 ? 'hours' : 'minutes') + ' saved today</b></div><p class="soft">' + f1(elevation()) + ' h this week. ' + (toGo() > 0 ? fh(toGo()) + ' h to the summit.' : 'Summit reached.') + '</p>' +
+      '<div class="rp-hero"><span>' + (tm >= 60 ? f1(tm / 60) : tm) + '</span><b>' + (tm >= 60 ? 'hours' : 'minutes') + ' saved today</b></div><p class="soft">' + f1(elevation()) + ' h this week. ' + (toGo() > 0 ? fh(toGo()) + ' h to the top of ' + esc(peakNow().name) + '.' : 'You made ' + esc(peakNow().name) + '.') + '</p>' +
       (on.length && tm ? '<div class="label">Today by camp</div><div class="bars">' + on.filter(function (c) { return minToday(c.id); }).map(function (c) {
         return '<div class="bar-row"><span class="br-name">' + esc(c.name) + '</span><span class="br-track"><span style="width:' + Math.round(minToday(c.id) / maxT * 100) + '%"></span></span><b class="num">' + minToday(c.id) + ' min</b></div>';
       }).join('') + '</div>' : '') +
@@ -833,7 +829,7 @@
       }).join('') + '</div>' +
       '<div class="label">Your photo</div><div class="row gap12 base">' + photoPick(56) + (state.photo ? '<button type="button" class="btn text" data-action="photo-remove">Remove</button>' : '') + '</div>' +
       '<div class="label">Your name</div><form class="row gap8" data-form="rename"><label class="sr" for="gear-name">Your first name</label><input id="gear-name" class="input grow" type="text" value="' + esc(state.name) + '" autocomplete="given-name"><button type="submit" class="btn ghost">Save</button></form>' +
-      '<div class="label">Your summit</div><div class="row base gap8"><span class="stat">' + state.summit + ' h</span><span class="soft">a week, for ' + esc(whyText()) + '</span></div><div class="chips">' + [-5, 5].map(function (d) { return '<button type="button" class="chipbtn" data-action="gear-summit" data-d="' + d + '">' + (d > 0 ? '+' : '') + d + ' h</button>'; }).join('') + '</div>' +
+      '<div class="label">Your first peak</div><div class="row base gap8"><span class="stat">' + state.summit + ' h</span><span class="soft">a week, for ' + esc(whyText()) + '</span></div><div class="chips">' + [-5, 5].map(function (d) { return '<button type="button" class="chipbtn" data-action="gear-summit" data-d="' + d + '">' + (d > 0 ? '+' : '') + d + ' h</button>'; }).join('') + '</div>' +
       '<div class="label">What it\'s for</div>' + whyChips() +
       '<div class="label">Your hourly value</div><p class="soft">Only you see it.</p>' + rateForm('gear-rate') + '<button type="submit" form="gear-rate-form" class="btn ghost">Save</button>' +
       '<div class="label">Your industries</div><p class="soft">Pick all that apply. They shape your map and camps.</p><div class="chips">' + D.INDUSTRIES.map(function (c) { return '<button type="button" class="chipbtn" aria-pressed="' + (state.inds.indexOf(c.id) > -1) + '" data-action="set-cohort" data-c="' + c.id + '">' + esc(c.name) + '</button>'; }).join('') + '</div>' +
@@ -1638,7 +1634,7 @@
   function checkin() {
     var list = openApprovals();
     sheet('<div class="ck"><div class="ck-rings">' + sherpaDisc(true, 96) + '</div><h2 class="ck-title">' + greeting() + ', ' + esc(state.name) + '</h2><p class="ck-sub">Sherpa · Check-in</p>' +
-      '<div class="ck-card"><div class="row between base"><span class="ck-num">' + f1(elevation()) + ' h</span><span class="ck-soft">' + (toGo() > 0 ? fh(toGo()) + ' to the summit' : 'Summit reached') + '</span></div>' +
+      '<div class="ck-card"><div class="row between base"><span class="ck-num">' + f1(elevation()) + ' h</span><span class="ck-soft">' + (toGo() > 0 ? fh(toGo()) + ' h to ' + esc(peakNow().name) : esc(peakNow().name) + ' climbed') + '</span></div>' +
       (list.length ? list.map(function (a) { return '<p>' + esc(a.who) + ': ' + esc(a.what.toLowerCase()) + '.</p>'; }).join('') : '<p>Nothing needs you today.</p>') + '</div>' +
       '<div class="row gap12 ck-actions"><button type="button" class="btn ghost-mist grow lg" data-action="checkin-text">Text me instead</button><button type="button" class="btn mist grow lg" data-action="checkin-answer">Answer</button></div></div>', { pine: true, label: 'Check-in', cls: 'full' });
   }
@@ -1670,7 +1666,7 @@
       return 'Tell me what to change, or ' + a.verb.toLowerCase() + ' it as it is.';
     }
     if (/elev|hour|summit|how far|progress|time back/.test(t)) {
-      return 'I\'ve saved you ' + f1(elevation()) + ' h this week, counted from the tasks I finished. ' + (toGo() > 0 ? fh(toGo()) + ' to the summit.' : 'You made the summit.');
+      return 'I\'ve saved you ' + f1(elevation()) + ' h this week, counted from the tasks I finished. ' + (toGo() > 0 ? fh(toGo()) + ' h to the top of ' + peakNow().name + '.' : 'You made ' + peakNow().name + '.');
     }
     if (/need|approv|waiting|pending|inbox/.test(t)) return n.length ? words(n.length) + ' things need you: ' + n.map(function (a) { return a.who + ' (' + a.what.toLowerCase() + ')'; }).join(', ') + '.' : 'Nothing needs you right now.';
     if (/today|log|did you|done/.test(t)) { var es = entries().filter(function (e) { return e.day === 'Today' && !e.undone; }); return es.length ? 'Today I saved you ' + todayMinutes() + ' minutes. ' + es.slice(0, 2).map(function (e) { return e.text; }).join('. ') + '.' : 'Nothing finished yet today. I\'m on it.'; }
