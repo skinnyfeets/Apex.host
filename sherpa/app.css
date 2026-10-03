@@ -551,16 +551,19 @@ a.ctile.is-on:hover { border-color: var(--pine); opacity: 0.94; }
 .view.is-preview:not(.is-full) .key-btn { display: none; }
 
 /* The intro: a full-screen fly-over with Sherpa's caption */
-.intro-card { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); z-index: 50; transform: translateX(-50%); width: min(600px, calc(100vw - 32px)); display: flex; align-items: flex-start; gap: 14px; padding: 20px; border-radius: 24px; box-shadow: 0 18px 40px rgba(28, 58, 40, 0.28); animation: intro-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1); }
-.intro-card b { font-size: 15px; }
-.intro-say { margin-top: 4px; min-height: 3.9em; font-size: 18px; line-height: 1.3; font-weight: 500; letter-spacing: -0.01em; }
-.intro-foot { margin-top: 14px; gap: 12px; }
-.intro-dots { display: inline-flex; gap: 6px; }
-.intro-dots i { width: 8px; height: 8px; border-radius: 999px; background: var(--m-line); }
+.intro-card { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); z-index: 50; transform: translateX(-50%); width: min(560px, calc(100vw - 32px)); padding: 20px 22px 16px; border-radius: 24px; box-shadow: 0 18px 40px rgba(28, 58, 40, 0.28); animation: intro-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.intro-head { display: flex; align-items: center; gap: 10px; }
+.intro-head b { font-size: 15px; }
+.intro-say { margin-top: 12px; min-height: 2.6em; font-size: 18px; line-height: 1.3; font-weight: 500; letter-spacing: -0.01em; }
+.intro-foot { margin-top: 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.btn.text-mist { background: transparent; color: var(--m-soft); padding: 0 4px; }
+.btn.text-mist:hover { color: var(--mist); }
+.intro-dots { display: inline-flex; gap: 5px; }
+.intro-dots i { width: 6px; height: 6px; border-radius: 999px; background: var(--m-line); }
 .intro-dots i.on { background: var(--mist); }
 @keyframes intro-in { from { opacity: 0; transform: translate(-50%, 24px); } to { opacity: 1; transform: translate(-50%, 0); } }
 @media (prefers-reduced-motion: reduce) { .intro-card { animation: none; } }
-@media (max-width: 520px) { .intro-card { padding: 16px; gap: 12px; } .intro-card .disc { width: 40px !important; height: 40px !important; } .intro-say { font-size: 16px; } }
+@media (max-width: 520px) { .intro-card { padding: 16px 18px 12px; } .intro-say { font-size: 16px; } }
 [hidden] { display: none !important; }
 .intro-acts { margin-top: 14px; }
 .chipbtn.on-pine { border-color: var(--m-line); color: var(--mist); }
@@ -725,3 +728,54 @@ a.ctile.is-on:hover { border-color: var(--pine); opacity: 0.94; }
 .start-copy > .inds + .row, .p-start .inds + .row { margin-top: 32px; }
 @media (max-width: 520px) { .inds { grid-template-columns: 1fr; } }
 .ind:last-child:nth-child(odd) { grid-column: 1 / -1; }
+/* The tutorial is a guided tour: the map behind it can't be clicked or dragged away from */
+.view.is-intro .view-art { pointer-events: none; }
+html.no-scroll, html.no-scroll body { overflow: hidden; overscroll-behavior: none; }
+.view.is-intro .view-art svg { width: 100%; height: 100%; }
+/* Summit: solid buttons over the texture, and the texture fills the whole screen */
+.summit .tex { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; z-index: 0; }
+.summit-wrap { z-index: 1; }
+.summit .tile-radio, .summit .btn.ghost { background: var(--mist); }
+.summit .tile-radio[aria-checked="true"] { background: var(--pine); }
+
+/* The range and peaks */
+.pk-card { padding: 18px; border-radius: 20px; border: 1.5px solid var(--pine); background: var(--mist); }
+.d-left .pk-card { margin-top: 12px; }
+.pk-k { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--soft); }
+.pk-link { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 700; text-decoration: none; }
+.pk-name { display: block; margin-top: 6px; font-size: 22px; letter-spacing: -0.02em; }
+.pk-next { margin-top: 14px; }
+.pk-progress { margin-top: 12px; display: flex; flex-direction: column; gap: 12px; text-align: left; width: 100%; max-width: 420px; }
+.summit-wrap .pk-progress { margin: 20px auto 8px; }
+.pk-row { display: flex; align-items: flex-start; gap: 10px; }
+.pk-row b { font-size: 14px; }
+.pk-check { width: 22px; height: 22px; flex-shrink: 0; display: grid; place-items: center; border-radius: 999px; border: 1.5px solid var(--line); }
+.pk-check svg { opacity: 0; }
+.pk-check.is-done { background: var(--pine); border-color: var(--pine); }
+.pk-check.is-done svg { opacity: 1; }
+.pk-track { margin-top: 6px; height: 6px; border-radius: 999px; background: var(--faint); overflow: hidden; }
+.pk-track span { display: block; height: 100%; border-radius: 999px; background: var(--pine); }
+.award-locked { filter: grayscale(1); opacity: 0.35; }
+.pk-goal { margin-top: 18px; display: flex; align-items: baseline; gap: 8px; }
+.pk-camps { margin-top: 10px; }
+.chip.is-on { background: var(--pine); border-color: var(--pine); color: var(--mist); }
+.pk-acts { margin-top: 20px; display: flex; flex-direction: column; gap: 10px; }
+.rg-head { margin-bottom: 16px; }
+.rg-view { height: calc(100dvh - 56px - 80px - 170px); min-height: 520px; }
+.d-page.rg-page { max-width: none; display: flex; flex-direction: column; }
+.d-page.rg-page .rg-view { flex: 1; height: auto; min-height: 560px; }
+.rg-btn { position: static; text-decoration: none; display: inline-flex; align-items: center; }
+/* a bigger map on the phone's Home */
+.view.is-preview { height: 640px; }
+.award-on, .award-locked { width: 100%; display: flex; justify-content: center; }
+.rec { margin-top: 12px; font-size: 14px; }
+/* the range gets the whole screen below its title */
+.rg-head { margin-bottom: 12px; }
+.rg-head .lede { margin-top: 6px; }
+.p-main.rg-page { max-width: none; padding-left: 8px; padding-right: 8px; }
+.p-main.rg-page .rg-head { padding: 0 8px; }
+.rg-view { height: calc(100dvh - 56px - 80px - 130px); min-height: 640px; }
+.d-page.rg-page .rg-view { min-height: calc(100dvh - 210px); }
+.stepper.sm { margin-top: 8px; } .stepper.sm .stepper-num { font-size: 40px; }
+.rate-form p.rate-say { margin-top: 14px; font-size: 15px; line-height: 1.45; color: var(--soft); max-width: 46ch; }
+.start-copy > .start-sub, .p-start > .start-sub { margin-top: 10px; }

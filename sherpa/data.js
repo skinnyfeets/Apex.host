@@ -186,6 +186,37 @@ window.SHERPA_DATA = (function () {
       core: ['mail', 'chat', 'clients', 'money'], camps: ['mail', 'chat', 'clients', 'money', 'projects', 'support', 'docs', 'marketing', 'social', 'store', 'team'], over: {} }
   ];
 
+  // The range. The first peak is the warm-up, sized by the hours you picked when you started. Reaching it opens
+  // the range: peaks scattered around it, each its own trail from the first peak, climbed in any order. Every
+  // peak is a part of the business to hand over. focus: the camps whose work counts on it (only the ones your
+  // industry has). hours: the weekly goal from those camps. challenge: what else it takes to stand on top.
+  // The last peak opens once you've climbed three others.
+  var PEAKS = [
+    { id: 'first', name: 'First Peak', tag: 'Learning the ropes', first: true },
+    { id: 'inbox', name: 'Inbox Pass', tag: 'Your inbox, handled', focus: ['mail'], hours: 4,
+      challenge: { type: 'streak', n: 3, text: 'Clear everything that needs you 3 days in a row' } },
+    { id: 'admin', name: 'Admin Peak', tag: 'Inbox, calendar and invoices', focus: ['mail', 'money', 'docs'], hours: 6,
+      challenge: { type: 'streak', n: 3, text: 'Clear everything that needs you 3 days in a row' } },
+    { id: 'cash', name: 'Cash Flow Crag', tag: 'Invoices, bills and payroll', focus: ['money', 'team'], hours: 3,
+      challenge: { type: 'streak', n: 2, text: 'Clear everything that needs you 2 days in a row' } },
+    { id: 'proposals', name: 'Proposal Spire', tag: 'Follow-ups and proposals', focus: ['clients', 'mail'], hours: 5,
+      challenge: { type: 'steps', n: 2, text: 'Finish 2 of Today\'s steps' } },
+    { id: 'revenue', name: 'Revenue Ridge', tag: 'Sales and marketing', focus: ['clients', 'marketing', 'social', 'store'], hours: 6,
+      challenge: { type: 'camps', n: 2, text: 'Connect 2 camps that feed this peak' } },
+    { id: 'care', name: 'Client Care Col', tag: 'Support and happy customers', focus: ['support', 'clients', 'store'], hours: 5,
+      challenge: { type: 'streak', n: 3, text: 'Clear everything that needs you 3 days in a row' } },
+    { id: 'content', name: 'Content Cliffs', tag: 'Posts, newsletters and comments', focus: ['social', 'marketing'], hours: 4,
+      challenge: { type: 'camps', n: 2, text: 'Connect 2 camps that feed this peak' } },
+    { id: 'ops', name: 'Operations Ridge', tag: 'Projects, support and the team', focus: ['projects', 'support', 'team', 'chat'], hours: 6,
+      challenge: { type: 'camps', n: 2, text: 'Connect 2 camps that feed this peak' } },
+    { id: 'team', name: 'Team Tor', tag: 'Your team, out of your inbox', focus: ['team', 'chat', 'projects'], hours: 4,
+      challenge: { type: 'camps', n: 2, text: 'Connect 2 camps that feed this peak' } },
+    { id: 'deep', name: 'Deep Work Dome', tag: 'Hours back for the work only you can do', hours: 10,
+      challenge: { type: 'steps', n: 3, text: 'Finish 3 of Today\'s steps' } },
+    { id: 'week', name: 'A Week Without You', tag: 'The business runs while you\'re away', final: true, needs: 3, hours: 20,
+      challenge: { type: 'streak', n: 5, text: 'Clear everything that needs you 5 days in a row' } }
+  ];
+
   var MODELS = [
     { id: 'Claude', by: 'Anthropic' },
     { id: 'ChatGPT', by: 'OpenAI' },
@@ -210,5 +241,5 @@ window.SHERPA_DATA = (function () {
     return out;
   })();
 
-  return { CAMPS: CAMPS, TRAILS: TRAILS, APPROVALS: APPROVALS, TASKS: TASKS, MODELS: MODELS, WHY: WHY, HIKERS: HIKERS, STEPS: STEPS, INDUSTRIES: INDUSTRIES, ALL_CAMPS: CAMPS.slice() };
+  return { CAMPS: CAMPS, TRAILS: TRAILS, APPROVALS: APPROVALS, TASKS: TASKS, MODELS: MODELS, WHY: WHY, HIKERS: HIKERS, STEPS: STEPS, PEAKS: PEAKS, INDUSTRIES: INDUSTRIES, ALL_CAMPS: CAMPS.slice() };
 })();

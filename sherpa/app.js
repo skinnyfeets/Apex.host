@@ -44,7 +44,6 @@
     social: '<path d="M12 20s-7-4.3-7-9.5A4 4 0 0 1 12 8a4 4 0 0 1 7 2.5C19 15.7 12 20 12 20z"/>',
     team: '<rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="12" cy="10" r="3"/><path d="M8 17c.6-2 2.2-3 4-3s3.4 1 4 3"/>',
     store: '<path d="M5 8h14l-1 12H6z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
-    gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
     camera: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>'
   };
   function icon(name, size, color, sw) {
@@ -55,7 +54,7 @@
   /* ================= state ================= */
   var KEY = 'apex-sherpa-app-v3';
   function fresh() {
-    return { name: '', photo: '', onboarded: false, step: 'welcome', summit: 20, whys: ['Family'], camps: {}, models: ['Claude'], approvals: {}, rejected: {}, trails: {}, perms: {}, undone: {}, reached: 0, summits: 0, lens: 'map', baseAt: 0, done: [], nextAt: 0, cursor: 0, mapN: 1, rate: 150, cohort: '', cleared: [], stepsDone: {}, blocked: {} };
+    return { name: '', photo: '', onboarded: false, step: 'welcome', summit: 5, whys: ['Family'], camps: {}, models: ['Claude'], approvals: {}, rejected: {}, trails: {}, perms: {}, undone: {}, reached: 0, summits: 0, lens: 'map', baseAt: 0, done: [], nextAt: 0, cursor: 0, mapN: 1, rate: 150, cohort: '', inds: [], cleared: [], stepsDone: {}, blocked: {}, peak: { id: 'first', at: 0 }, peaksDone: [] };
   }
   var state = load();
   function load() {
@@ -65,6 +64,9 @@
     if (!s.models || !s.models.length) s.models = [s.model || 'Claude'];
     if (s.why && !(s.whys && s.whys.length)) s.whys = [s.why];
     if (s.cohort === 'service') s.cohort = 'trades';
+    if (!s.inds) s.inds = s.cohort ? [s.cohort] : [];
+    if (!s.peak || !s.peak.id) s.peak = { id: 'first', at: s.baseAt || 0 };
+    if (!s.peaksDone) s.peaksDone = [];
     s.models = s.models.map(function (m) { return m === 'GPT' ? 'ChatGPT' : m === 'Llama' ? 'Other' : m; }).filter(function (m, i, a) { return a.indexOf(m) === i; });
     delete s.why;
     return s;
@@ -79,18 +81,28 @@
   // trail log never breaks.
   function camp(id) { return find(D.CAMPS, id) || find(D.ALL_CAMPS, id); }
   function isOn(id) { return !!state.camps[id] && !!find(D.CAMPS, id); }
+  // Your industries, first pick first. The first one is your main one: it names camps that overlap and sets
+  // who "businesses like yours" are on the leaderboard.
+  function inds() { return (state.inds && state.inds.length ? state.inds : state.cohort ? [state.cohort] : []).map(function (id) { return find(D.INDUSTRIES, id); }).filter(Boolean); }
   function industry(id) { return find(D.INDUSTRIES, id || state.cohort) || D.INDUSTRIES[0]; }
+  function indKey() { return (state.inds && state.inds.length ? state.inds : [state.cohort || 'agency']).join('+'); }
   // Your industry decides the map: which camps exist, which four are everyday camps, and what each is called
   // and connects to. Switching industry draws a new mountain.
+  // Run more than one business? Every industry you picked adds its camps and its everyday camps to one map.
   function applyIndustry() {
-    var ind = industry();
+    var list = inds(); if (!list.length) list = [industry()];
+    var ids = [], core = [];
+    list.forEach(function (ind) { ind.core.forEach(function (id) { if (core.indexOf(id) < 0) core.push(id); }); });
+    core.forEach(function (id) { ids.push(id); });
+    list.forEach(function (ind) { ind.camps.forEach(function (id) { if (ids.indexOf(id) < 0) ids.push(id); }); });
     D.CAMPS.length = 0;
-    ind.camps.forEach(function (id) {
-      var b = find(D.ALL_CAMPS, id), o = ind.over[id] || {}, c = {};
+    ids.forEach(function (id) {
+      var b = find(D.ALL_CAMPS, id), o = {}, c = {};
+      for (var i = list.length - 1; i >= 0; i--) { var ov = list[i].over[id] || {}; for (var kk in ov) o[kk] = ov[kk]; }
       for (var k in b) c[k] = b[k];
       for (k in o) c[k] = o[k];
       if (o.name && !o.short) c.short = o.name;
-      c.core = ind.core.indexOf(id) > -1;
+      c.core = core.indexOf(id) > -1;
       D.CAMPS.push(c);
     });
     worlds = {}; brainCache = {}; session.mapVB = {};
@@ -116,7 +128,34 @@
   function savedMin(campId) { return weekDone(campId).reduce(function (a, d) { return a + d.min; }, 0); }
   function campHours(id) { return r1(savedMin(id) / 60); }
   function elevation() { return r1(savedMin() / 60); }
-  function toGo() { return r1(Math.max(0, state.summit - elevation())); }
+  /* The range: you climb one peak at a time. The first is a warm-up; the rest each count the work in their own
+     camps, start from zero, and come with a challenge. */
+  var WEEK_MS = 7 * 86400000;
+  function peakDef(id) { return D.PEAKS.filter(function (p) { return p.id === id; })[0] || D.PEAKS[0]; }
+  function peakNow() { return peakDef(state.peak.id); }
+  // The warm-up is the hours you picked when you started (we suggest 5). Every other peak sets its own goal.
+  function firstGoal() { return state.summit; }
+  function peakGoal(p) { p = p || peakNow(); return p.first ? firstGoal() : p.final ? (state.weekGoal || p.hours) : p.hours; }
+  function focusCamps(p) { return p.focus ? D.CAMPS.filter(function (c) { return p.focus.indexOf(c.id) > -1; }) : D.CAMPS.slice(); }
+  // The peaks your industry can climb: a peak needs at least one of its camps on your map.
+  function rangePeaks() { return D.PEAKS.filter(function (p) { return !p.focus || focusCamps(p).length; }); }
+  // Hours on this peak: the last seven days of work in its camps, counted only from when you started it.
+  function peakHours(p) {
+    p = p || peakNow();
+    var from = Math.max(state.peak.at || 0, Date.now() - WEEK_MS), ids = p.focus ? focusCamps(p).map(function (c) { return c.id; }) : null;
+    return r1(liveDone().filter(function (d) { return d.ts >= from && (!ids || ids.indexOf(d.camp) > -1); }).reduce(function (a, d) { return a + d.min; }, 0) / 60);
+  }
+  function challenge(p) {
+    p = p || peakNow(); var ch = p.challenge; if (!ch) return null;
+    var have = ch.type === 'streak' ? streak() : ch.type === 'steps' ? D.STEPS.filter(function (st) { return (state.stepsDone[st.id] || 0) >= (state.peak.at || 0); }).length : focusCamps(p).filter(function (c) { return isOn(c.id); }).length;
+    var need = ch.type === 'camps' ? Math.min(ch.n, focusCamps(p).length) : ch.n;
+    return { text: ch.text, have: Math.min(have, need), need: need, done: have >= need };
+  }
+  function peakDone(id) { return state.peaksDone.some(function (d) { return d.id === id; }); }
+  function onTop() { return state.peaksDone.some(function (d) { return d.id === state.peak.id && d.at >= (state.peak.at || 0); }); }
+  function peakReached() { var ch = challenge(); return climbing() && peakHours() >= peakGoal() && (!ch || ch.done); }
+  function toGo() { return r1(Math.max(0, peakGoal() - peakHours())); }
+  function peakLocked(p) { return p.final && state.peaksDone.filter(function (d) { return !peakDef(d.id).first; }).length < (p.needs || 3); }
   function todayMinutes() { var a = startOfDay(); return liveDone().filter(function (d) { return d.ts >= a; }).reduce(function (s, d) { return s + d.min; }, 0); }
   // Past Base Camp: the AI is picked and time saved counts.
   function climbing() { return !!state.baseAt; }
@@ -178,7 +217,7 @@
 
   /* ================= routing ================= */
   
-  var KNOWN = ['home', 'map', 'approvals', 'log', 'camps', 'gear', 'report', 'summit', 'leaderboard'];
+  var KNOWN = ['home', 'map', 'approvals', 'log', 'camps', 'gear', 'report', 'summit', 'leaderboard', 'range'];
   function parse() {
     var h = (location.hash || '').replace(/^#\/?/, '');
     if (!state.onboarded) { if (!/^start-(welcome|name|industry|summit|rate|coords|trailhead)$/.test(h)) h = 'start-' + state.step; }
@@ -187,7 +226,7 @@
     if (m && !camp(m[1])) { h = 'camps'; m = null; }
     if (!m && !/^start-/.test(h) && KNOWN.indexOf(h) < 0) h = 'home';
     var name = m ? 'camp' : (/^start-/.test(h) ? 'start' : h);
-    var section = { home: 'home', map: 'home', approvals: 'approvals', summit: 'home', leaderboard: 'leaderboard', camps: 'camps', camp: 'camps', log: 'log', report: 'log', gear: 'gear', start: 'start' }[name];
+    var section = { home: 'home', map: 'home', approvals: 'approvals', summit: 'home', range: 'home', leaderboard: 'leaderboard', camps: 'camps', camp: 'camps', log: 'log', report: 'log', gear: 'gear', start: 'start' }[name];
     return { hash: h, name: name, camp: m ? m[1] : null, step: name === 'start' ? h.slice(6) : null, section: section };
   }
   function go(h) { if (location.hash === '#' + h) render(); else location.hash = '#' + h; }
@@ -198,7 +237,7 @@
 
   function logo(h) { return '<a href="#home" class="logo" aria-label="Apex home"><img src="assets/logo-green.svg" alt="Apex" height="' + h + '" width="' + Math.round(h * 3.35) + '"></a>'; }
   function elevPill() {
-    return '<a href="#log" class="elev-pill" aria-label="Elevation ' + f1(elevation()) + ' of ' + state.summit + ' hours a week. Open the trail log.">' + PEAK + '<b>' + f1(elevation()) + '</b><span>/ ' + state.summit + ' h</span></a>';
+    return '<a href="#summit" class="elev-pill" aria-label="' + esc(peakNow().name) + ': ' + f1(peakHours()) + ' of ' + peakGoal() + ' hours a week.">' + PEAK + '<b>' + f1(peakHours()) + '</b><span>/ ' + peakGoal() + ' h</span></a>';
   }
   function face() { return state.photo ? '<img src="' + state.photo + '" alt="">' : esc(initial()); }
   function avatar() { return '<button type="button" class="avatar' + (state.photo ? ' has-photo' : '') + '" data-action="go" data-to="gear" aria-label="Settings">' + face() + '</button>'; }
@@ -214,11 +253,11 @@
       '<p class="elev-note">Time saved starts when Sherpa is at work, after Base Camp. Only tasks Sherpa actually finishes count.</p></section>';
     // Past Base Camp: a training-log style week. Time saved against the summit, the numbers behind it, and
     // a bar for each of the last seven days. Every figure comes from tasks Sherpa actually finished.
-    var e = elevation(), pct = clamp(Math.round(e / state.summit * 100), 0, 100), tm = todayMinutes(), wk = weekDone();
-    return '<section class="elev wk" aria-label="Last 7 days: ' + f1(e) + ' hours saved of a ' + state.summit + ' hour summit.">' +
+    var e = elevation(), pct = clamp(Math.round(peakHours() / peakGoal() * 100), 0, 100), tm = todayMinutes(), wk = weekDone();
+    return '<section class="elev wk" aria-label="Last 7 days: ' + f1(e) + ' hours saved.">' +
       '<div class="row between base"><span class="wk-k">Last 7 days</span><a href="#log" class="wk-link">Trail log ' + icon('arrow', 13, MIST, 2.4) + '</a></div>' +
       '<div class="elev-num"><span>' + f1(e) + '</span><small>h saved</small></div>' +
-      '<div class="wk-goal"><span class="wk-track"><span style="width:' + pct + '%"></span></span><span class="wk-pct">' + pct + '% of ' + state.summit + ' h</span></div>' +
+      '<div class="wk-goal"><span class="wk-track"><span style="width:' + pct + '%"></span></span><span class="wk-pct">' + pct + '% of ' + esc(peakNow().name) + '</span></div>' +
       '<div class="wk-stats">' + statCell('Today', tm >= 60 ? fh(tm / 60) + ' h' : tm + ' min') + statCell('Tasks', wk.length) + statCell('Bought back', boughtBack(e)) + statCell('Streak', streak() + (streak() === 1 ? ' day' : ' days')) + '</div>' +
       daysChart(null, true) + (resting() ? '<p class="elev-note">Sherpa has done all it can in your camps today. Back tomorrow at 8.</p>' : '') + '</section>';
   }
@@ -288,8 +327,8 @@
         '</div>';
     }).join('') + '</div>';
   }
-  // How long something has waited on you, counted in the demo's days.
-  function waitLabel(a) { var d = (a.waited || 0) + Math.floor((startOfDay() - startOfDay(state.baseAt || Date.now())) / DAY); return d <= 0 ? 'since this morning' : d === 1 ? 'waiting 1 day' : 'waiting ' + d + ' days'; }
+  // How long something has waited on you.
+  function waitLabel(a) { var d = a.waited || 0; return d <= 0 ? 'since this morning' : d === 1 ? 'waiting 1 day' : 'waiting ' + d + ' days'; }
   function approveAllLabel(n) { return n === 3 ? 'Approve all three' : n === 2 ? 'Approve both' : 'Approve it'; }
 
 
@@ -310,6 +349,7 @@
     return '<section class="view' + full + (opts.ask ? ' has-ask' : '') + (opts.cls ? ' ' + opts.cls : '') + '" data-scope="' + scope + '" data-lens="' + lens + '" aria-label="' + esc(label) + '">' +
       '<div class="view-art"></div>' +
       '<div class="view-bar">' +
+      (home && state.peaksDone && state.peaksDone.length ? '<a href="#range" class="key-btn rg-btn">The range</a>' : '') +
       (home ? '<div class="seg" role="group" aria-label="View"><button type="button" data-action="lens" data-lens="map" aria-pressed="' + (lens === 'map') + '">Map</button><button type="button" data-action="lens" data-lens="brain" aria-pressed="' + (lens === 'brain') + '">Brain</button></div>' : '') +
       (opts.noExpand ? '' : '<button type="button" class="icon-btn" data-action="full" aria-label="' + (session.full ? 'Exit full screen' : 'Full screen') + '">' + icon(session.full ? 'shrink' : 'expand', 18, PINE, 2.2) + '</button>') +
       '</div>' +
@@ -330,7 +370,7 @@
       k('<span class="k-dot"></span>', '<b>Connected camp.</b> A tool Sherpa works in.') +
       k('<span class="k-dot is-dashed"></span>', '<b>Dashed camp.</b> Not connected yet. Tap to connect.') +
       k(icon('base', 14, PINE, 1.8), '<b>Base Camp.</b> The AI that runs Sherpa.') +
-      k('<img src="assets/icon.svg" alt="" width="12" height="13">', '<b>Summit.</b> Your goal, ' + state.summit + ' h a week.') +
+      k('<img src="assets/icon.svg" alt="" width="12" height="13">', '<b>Peaks.</b> First Peak, then the range beyond it. Tap one to see its goal.') +
       k('<svg width="14" height="18" viewBox="0 0 14 18" aria-hidden="true"><path d="M7 18 L1.4 9.8 A6.5 6.5 0 1 1 12.6 9.8 Z" fill="' + PINE + '"/><circle cx="7" cy="6.6" r="3.2" fill="' + MIST + '"/></svg>', climbing() ? '<b>You.</b> Time saved this week, from finished tasks.' : '<b>You.</b> You climb once Sherpa is at work.') +
       '</ul></div>';
   }
@@ -369,23 +409,22 @@
       '<span class="avatar" style="width:' + size + 'px;height:' + size + 'px;font-size:' + Math.round(size * 0.4) + 'px">' + (state.photo ? '<img src="' + state.photo + '" alt="">' : state.name ? esc(initial()) : icon('camera', Math.round(size * 0.36), PINE, 2)) + '</span>' +
       '<span class="photo-pick-t">' + (state.photo ? 'Change photo' : 'Add a photo') + '</span></label>';
   }
-  function guideLine(t) { return '<div class="guide-line">' + sherpaDisc(false, 40) + '<p>' + t + '</p></div>'; }
   // The hourly-value field and Sherpa's explanation of it, which updates as you type. Your Buyback Rate (Dan
   // Martell's) is a quarter of your hourly value: the most it's worth paying to hand an hour of work off.
   function rateSay(v) {
     if (!(v > 0)) return 'Not sure? Take what you earn in a year and divide it by 2,000 working hours.';
-    return money(v) + ' an hour. That makes your Buyback Rate ' + money(v / 4) + ': anything that costs less than that an hour, hand it off. Every hour I save you is ' + money(v) + ' bought back.';
+    return money(v) + ' an hour. That makes your Buyback Rate ' + money(v / 4) + ': anything that costs less than that an hour, hand it off. Every hour Sherpa saves you is ' + money(v) + ' bought back.';
   }
   function rateForm(kind) {
     var v = kind === 'rate' && !state.rateSet ? '' : state.rate;
     return '<form class="rate-form" id="' + kind + '-form" data-form="' + kind + '"><label class="sr" for="' + kind + '-in">Your hourly value in dollars</label>' +
-      '<div class="rate-field"><span>$</span><input id="' + kind + '-in" class="rate-in" name="rate" type="number" inputmode="numeric" min="1" max="100000" step="1" placeholder="200" value="' + esc(v) + '"><span>/ hour</span></div>' +
+      '<div class="rate-field"><span>$</span><input id="' + kind + '-in" class="rate-in" name="rate" type="number" inputmode="numeric" min="1" max="100000" step="1" value="' + esc(v) + '"><span>/ hour</span></div>' +
       (session.rateError ? '<p class="err" role="alert">Add what an hour of your time is worth to keep going.</p>' : '') +
-      '<div class="guide-line rate-say">' + sherpaDisc(false, 32) + '<p data-rate-say>' + esc(rateSay(Number(v))) + '</p></div></form>';
+      '<p class="rate-say" data-rate-say>' + esc(rateSay(Number(v))) + '</p></form>';
   }
   function startBody(step) {
     if (step === 'name') {
-      return guideLine('I\'m Sherpa, your guide. I\'ll get you set up and do the work that wins your time back.') + '<h1>What\'s your name?</h1>' +
+      return '<h1>What\'s your name?</h1>' +
         '<form class="name-form" data-form="name">' + photoPick(72) + '<label class="sr" for="you-name">Your first name</label>' +
         '<input id="you-name" name="name" class="big-input" type="text" autocomplete="given-name" placeholder="Your first name" value="' + esc(state.name) + '">' +
         (session.nameError ? '<p class="err" role="alert">Add your first name to keep going.</p>' : '') +
@@ -393,23 +432,23 @@
     }
     if (step === 'industry') {
       return '<h1>What kind of business do you run?</h1>' +
-        '<div class="inds" role="radiogroup" aria-label="Industry">' + D.INDUSTRIES.map(function (ind) {
-          return '<button type="button" class="ind" role="radio" aria-checked="' + (state.cohort === ind.id) + '" data-action="set-cohort" data-c="' + ind.id + '">' +
+        '<p class="soft start-sub">Pick all that apply.</p><div class="inds" role="group" aria-label="Industries">' + D.INDUSTRIES.map(function (ind) {
+          return '<button type="button" class="ind" role="checkbox" aria-checked="' + (state.inds.indexOf(ind.id) > -1) + '" data-action="set-cohort" data-c="' + ind.id + '">' +
             '<span class="ind-ico">' + icon(ind.icon, 18, PINE, 1.9) + '</span><b>' + esc(ind.name) + '</b></button>';
         }).join('') + '</div>' +
-        '<div class="row gap12"><button type="button" class="btn primary lg" data-action="step" data-to="summit"' + (state.cohort ? '' : ' disabled') + '>Next</button><button type="button" class="btn text" data-action="step" data-to="name">Back</button></div>';
+        '<div class="row gap12"><button type="button" class="btn primary lg" data-action="step" data-to="summit"' + (state.inds.length ? '' : ' disabled') + '>Next</button><button type="button" class="btn text" data-action="step" data-to="name">Back</button></div>';
     }
     if (step === 'summit') {
       return '<h1>How much time would you like to save each week?</h1>' +
         '<div class="stepper"><button type="button" class="round-btn" data-action="hours" data-d="-1" aria-label="Fewer hours">' + icon('minus', 20, PINE, 2.5) + '</button>' +
         '<output class="stepper-num" aria-live="polite">' + state.summit + '</output>' +
         '<button type="button" class="round-btn" data-action="hours" data-d="1" aria-label="More hours">' + icon('plus', 20, PINE, 2.5) + '</button><span class="stepper-unit">hours<br>a week</span></div>' +
+        '<p class="soft rec">Recommended to start: 5 h. It\'s your first peak. You\'ll climb higher from there.</p>' +
         '<h2 class="start-h2">What do you want the extra time for?</h2>' + whyChips() +
         '<div class="row gap12"><button type="button" class="btn primary lg" data-action="step" data-to="rate">Next</button><button type="button" class="btn text" data-action="step" data-to="industry">Back</button></div>';
     }
     if (step === 'rate') {
-      return guideLine('One more question, ' + esc(state.name) + '.') +
-        '<h1>What\'s an hour of your time worth?</h1>' + rateForm('rate', 'Next') +
+      return         '<h1>What\'s an hour of your time worth?</h1>' + rateForm('rate', 'Next') +
         '<div class="row gap12"><button type="submit" form="rate-form" class="btn primary lg">Next</button><button type="button" class="btn text" data-action="step" data-to="summit">Back</button></div>';
     }
     // how the climb works: the whole idea, in Sherpa's words, before the map
@@ -417,7 +456,7 @@
       ['base', 'Make Base Camp', 'Pick the AI that runs me: Claude, ChatGPT, Gemini or another. One is enough for now.'],
       ['mail', 'Make your first camp', 'Connect a tool you already use, like Gmail or Slack. Each tool is a camp, and I get to work in it.'],
       ['check', 'Climb on real work', 'Every task I finish goes in your trail log with the time it would have taken you. Only finished work counts.'],
-      ['flag', 'Reach your summit', state.summit + ' hours a week, for ' + esc(whyText()) + '.'],
+      ['flag', 'Climb the range', 'Your first peak is ' + firstGoal() + ' hours a week. Reach it and a whole range of peaks opens up. Climb them in any order.'],
       ['docs', 'Read your trail report', 'Every evening I tell you what I did, the time it saved and what\'s next.']
     ];
     return '<h1>How the climb works</h1>' +
@@ -451,7 +490,7 @@
       return '<a href="#' + n[0] + '" class="nav-link' + (on ? ' is-on' : '') + '"' + (on ? ' aria-current="page"' : '') + '>' + n[1] + (n[0] === 'approvals' && need ? '<span class="tab-n">' + need + '</span>' : '') + '</a>';
     }).join('');
     return '<header class="d-head">' + logo(30) + '<nav class="d-nav" aria-label="Main">' + nav + '</nav><div class="row gap12">' + elevPill() +
-      '<a href="#gear" class="icon-btn' + (r.section === 'gear' ? ' is-on' : '') + '" aria-label="Settings"' + (r.section === 'gear' ? ' aria-current="page"' : '') + '>' + icon('gear', 20, PINE, 2) + '</a>' + avatar() + '</div></header>';
+      avatar() + '</div></header>';
   }
   function pHeader(r, back) {
     var left = back ? '<a href="#' + back[0] + '" class="back">' + icon('back', 16, PINE, 2.5) + back[1] + '</a>' : logo(24);
@@ -567,14 +606,14 @@
   }
   function renderHome(r) {
     if (desk()) {
-      return dHeader(r) + '<main class="d-grid" id="main"><aside class="d-left">' + (guiding() ? '' : reportPop()) + elevCard() + campsLink() + boardLink() + '</aside>' +
+      return dHeader(r) + '<main class="d-grid" id="main"><aside class="d-left">' + (guiding() ? '' : reportPop()) + elevCard() + peakCard() + campsLink() + boardLink() + '</aside>' +
         '<div class="d-center">' + viewPanel('home', { ask: 'Ask Sherpa' }) + '</div>' + homeSherpaPanel() + '</main>';
     }
     var n = openApprovals().length;
     if (!climbing()) return pHeader(r) + '<main class="p-main" id="main"><div class="sp-card pine">' + sherpaHead('Your guide') + guide() + '</div>' + elevCard(true) +
       viewPanel('home', { cls: 'is-preview', noExpand: true }) + '<a href="#map" class="link-row">Open the full map ' + icon('arrow', 16, PINE, 2.2) + '</a>' +
       campsLink() + boardLink() + '</main>' + pTabs(r);
-    return pHeader(r) + '<main class="p-main" id="main">' + (guiding() ? '<div class="sp-card pine">' + sherpaHead('Your guide') + guide() + '</div>' : reportPop()) + elevCard(true) +
+    return pHeader(r) + '<main class="p-main" id="main">' + (guiding() ? '<div class="sp-card pine">' + sherpaHead('Your guide') + guide() + '</div>' : reportPop()) + peakCard() + elevCard(true) +
       stepCard(false) +
       '<a href="#approvals" class="need"><span class="need-n">' + n + '</span><span class="grow col"><span>' + (n === 1 ? 'needs you' : n ? 'need you' : 'All clear') + '</span>' + (streakLine(n) ? '<small>' + streakLine(n) + '</small>' : '') + '</span><span class="btn primary sm">' + (n ? 'Review' : 'Open') + '</span></a>' +
       viewPanel('home', { cls: 'is-preview', noExpand: true }) +
@@ -797,7 +836,7 @@
       '<div class="label">Your summit</div><div class="row base gap8"><span class="stat">' + state.summit + ' h</span><span class="soft">a week, for ' + esc(whyText()) + '</span></div><div class="chips">' + [-5, 5].map(function (d) { return '<button type="button" class="chipbtn" data-action="gear-summit" data-d="' + d + '">' + (d > 0 ? '+' : '') + d + ' h</button>'; }).join('') + '</div>' +
       '<div class="label">What it\'s for</div>' + whyChips() +
       '<div class="label">Your hourly value</div><p class="soft">Only you see it.</p>' + rateForm('gear-rate') + '<button type="submit" form="gear-rate-form" class="btn ghost">Save</button>' +
-      '<div class="label">Your industry</div><p class="soft">Shapes your map and camps.</p><div class="chips">' + D.INDUSTRIES.map(function (c) { return '<button type="button" class="chipbtn" aria-pressed="' + (state.cohort === c.id) + '" data-action="set-cohort" data-c="' + c.id + '">' + esc(c.name) + '</button>'; }).join('') + '</div>' +
+      '<div class="label">Your industries</div><p class="soft">Pick all that apply. They shape your map and camps.</p><div class="chips">' + D.INDUSTRIES.map(function (c) { return '<button type="button" class="chipbtn" aria-pressed="' + (state.inds.indexOf(c.id) > -1) + '" data-action="set-cohort" data-c="' + c.id + '">' + esc(c.name) + '</button>'; }).join('') + '</div>' +
       '<div class="label">Leaderboard</div><div class="row between gap12"><span class="soft">' + (state.hideRanks ? 'Rankings are off. You only see your own climb.' : 'Rankings are on.') + '</span><button type="button" class="btn ghost sm" data-action="toggle-ranks">' + (state.hideRanks ? 'Show rankings' : 'Hide rankings') + '</button></div>' +
       '<div class="label">Demo</div><div class="row gap8 wrap"><button type="button" class="btn ghost" data-action="skip-day"' + (climbing() ? '' : ' disabled') + '>Skip ahead a day</button><button type="button" class="btn ghost" data-action="intro-replay">Watch the intro again</button><button type="button" class="btn ghost" data-action="reset">Start over</button></div>';
     if (desk()) return dHeader(r) + '<main class="d-page narrow" id="main">' + body + '</main>';
@@ -805,7 +844,7 @@
   }
 
   var ROSETTE = 'M262.5 128.0 L261.1 131.2 L257.8 134.2 L254.5 137.0 L252.9 139.9 L253.8 143.0 L256.5 146.5 L259.2 150.1 L259.8 153.5 L257.8 156.3 L254.0 158.5 L250.1 160.6 L247.9 163.1 L248.2 166.3 L250.2 170.3 L252.0 174.4 L251.9 177.8 L249.4 180.2 L245.1 181.6 L240.9 182.8 L238.3 184.8 L237.9 188.0 L239.0 192.3 L239.9 196.6 L239.1 200.0 L236.1 201.8 L231.7 202.3 L227.3 202.6 L224.3 203.9 L223.3 207.0 L223.4 211.4 L223.4 215.9 L222.0 219.0 L218.7 220.1 L214.3 219.7 L209.9 219.1 L206.7 219.8 L205.0 222.6 L204.3 227.0 L203.3 231.3 L201.2 234.1 L197.8 234.5 L193.6 233.1 L189.4 231.6 L186.2 231.7 L183.9 234.1 L182.3 238.2 L180.5 242.2 L177.9 244.5 L174.4 244.2 L170.5 242.0 L166.8 239.6 L163.6 239.0 L160.9 240.9 L158.5 244.5 L155.8 248.1 L152.8 249.8 L149.5 248.8 L146.2 245.8 L143.0 242.8 L140.0 241.5 L137.0 242.8 L133.8 245.8 L130.5 248.8 L127.2 249.8 L124.2 248.1 L121.5 244.5 L119.1 240.9 L116.4 239.0 L113.2 239.6 L109.5 242.0 L105.6 244.2 L102.1 244.5 L99.5 242.2 L97.7 238.2 L96.1 234.1 L93.8 231.7 L90.6 231.6 L86.4 233.1 L82.2 234.5 L78.8 234.1 L76.7 231.3 L75.7 227.0 L75.0 222.6 L73.3 219.8 L70.1 219.1 L65.7 219.7 L61.3 220.1 L58.0 219.0 L56.6 215.9 L56.6 211.4 L56.7 207.0 L55.7 203.9 L52.7 202.6 L48.3 202.3 L43.9 201.8 L40.9 200.0 L40.1 196.6 L41.0 192.3 L42.1 188.0 L41.7 184.8 L39.1 182.8 L34.9 181.6 L30.6 180.2 L28.1 177.8 L28.0 174.4 L29.8 170.3 L31.8 166.3 L32.1 163.1 L29.9 160.6 L26.0 158.5 L22.2 156.3 L20.2 153.5 L20.8 150.1 L23.5 146.5 L26.2 143.0 L27.1 139.9 L25.5 137.0 L22.2 134.2 L18.9 131.2 L17.5 128.0 L18.9 124.8 L22.2 121.8 L25.5 119.0 L27.1 116.1 L26.2 113.0 L23.5 109.5 L20.8 105.9 L20.2 102.5 L22.2 99.7 L26.0 97.5 L29.9 95.4 L32.1 92.9 L31.8 89.7 L29.8 85.7 L28.0 81.6 L28.1 78.2 L30.6 75.8 L34.9 74.4 L39.1 73.2 L41.7 71.3 L42.1 68.0 L41.0 63.7 L40.1 59.4 L40.9 56.0 L43.9 54.2 L48.3 53.7 L52.7 53.4 L55.7 52.1 L56.7 49.0 L56.6 44.6 L56.6 40.1 L58.0 37.0 L61.3 35.9 L65.7 36.3 L70.1 36.9 L73.3 36.2 L75.0 33.4 L75.7 29.0 L76.7 24.7 L78.7 21.9 L82.2 21.5 L86.4 22.9 L90.6 24.4 L93.8 24.3 L96.1 21.9 L97.7 17.8 L99.5 13.8 L102.1 11.5 L105.6 11.8 L109.5 14.0 L113.2 16.4 L116.4 17.0 L119.1 15.1 L121.5 11.5 L124.2 7.9 L127.2 6.2 L130.5 7.2 L133.8 10.2 L137.0 13.2 L140.0 14.5 L143.0 13.2 L146.2 10.2 L149.5 7.2 L152.8 6.2 L155.8 7.9 L158.5 11.5 L160.9 15.1 L163.6 17.0 L166.8 16.4 L170.5 14.0 L174.4 11.8 L177.9 11.5 L180.5 13.8 L182.3 17.8 L183.9 21.9 L186.2 24.3 L189.4 24.4 L193.6 22.9 L197.8 21.5 L201.2 21.9 L203.3 24.7 L204.3 29.0 L205.0 33.4 L206.7 36.2 L209.9 36.9 L214.3 36.3 L218.7 35.9 L222.0 37.0 L223.4 40.1 L223.4 44.6 L223.3 49.0 L224.3 52.1 L227.3 53.4 L231.7 53.7 L236.1 54.2 L239.1 56.0 L239.9 59.4 L239.0 63.7 L237.9 68.0 L238.3 71.3 L240.9 73.2 L245.1 74.4 L249.4 75.8 L251.9 78.2 L252.0 81.6 L250.2 85.7 L248.2 89.7 L247.9 92.9 L250.1 95.4 L254.0 97.5 L257.8 99.7 L259.8 102.5 L259.2 105.9 L256.5 109.5 L253.8 113.0 L252.9 116.1 L254.5 119.0 L257.8 121.8 L261.1 124.8 Z';
-  function award(hours, name, n) {
+  function award(hours, name, n, peakName) {
     return '<svg class="award" viewBox="0 0 280 340" role="img" aria-label="Summit award ' + n + ', awarded to ' + esc(name) + ': ' + hours + ' hours a week, ' + monthTag() + '">' +
       '<defs><path id="award-arc" d="M 56 128 A 84 84 0 0 1 224 128"/></defs>' +
       '<polygon points="92,186 134,196 98,326 76,306 52,320" fill="' + PINE + '"/><polygon points="146,196 188,186 228,320 204,306 182,326" fill="' + PINE + '"/>' +
@@ -817,26 +856,36 @@
       '<text x="140" y="146" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="46" font-weight="900" letter-spacing="-2" fill="' + MIST + '">' + hours + ' H</text>' +
       '<text x="140" y="164" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="10" font-weight="800" letter-spacing="2.5" fill="' + MIST + '">SAVED A WEEK</text>' +
       '<polygon points="14,174 266,174 254,188 266,202 14,202 26,188" fill="' + MIST + '" stroke="' + PINE + '" stroke-width="1.5" stroke-linejoin="round"/>' +
-      '<text x="140" y="193" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="14" font-weight="900" letter-spacing="3" fill="' + PINE + '">SUMMIT ' + ('0' + n).slice(-2) + '</text>' +
+      '<text x="140" y="193" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="' + ((peakName || '').length > 14 ? 11 : 14) + '" font-weight="900" letter-spacing="' + ((peakName || '').length > 14 ? 1.5 : 3) + '" fill="' + PINE + '">' + esc((peakName || 'Summit ' + ('0' + n).slice(-2)).toUpperCase()) + '</text>' +
       '<text x="140" y="222" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="10" font-weight="700" letter-spacing="2.5" fill="' + MIST + '">' + monthTag() + '</text></svg>';
   }
-  var nextPick = null;
   function renderSummit(r) {
-    var reached = elevation() >= state.summit;
-    var hrs = state.summit, n = Math.max(1, state.summits + (reached && state.reached !== state.summit ? 1 : 0));
-    var opts = [[hrs + 5, 'The next ridge'], [hrs + 10, 'The high pass'], [hrs, 'Stay here']];
-    if (!nextPick) nextPick = opts[0][0];
-    var body = '<div class="summit-wrap">' + award(hrs, state.name, n) +
-      (reached ? '<h1>You made the summit</h1><p class="lede">' + hrs + ' hours saved a week, for ' + esc(whyText()) + '.</p>' +
-        '<div class="label">Your next summit</div><div class="tiles3" role="radiogroup" aria-label="Next summit">' + opts.map(function (o, i) {
-          var val = i === 2 ? 'hold' : o[0];
-          return '<button type="button" class="tile-radio" role="radio" aria-checked="' + (String(nextPick) === String(val)) + '" data-action="next-pick" data-v="' + val + '"><b>' + (i === 2 ? 'Hold' : o[0] + ' h') + '</b><span>' + (i === 2 ? 'at ' + hrs + ' h saved' : 'saved a week') + '</span><small>' + o[1] + '</small></button>';
-        }).join('') + '</div>' +
-        '<div class="row gap12 center"><button type="button" class="btn primary lg" data-action="next-set">' + (nextPick === 'hold' ? 'Hold at ' + hrs + ' h' : 'Climb to ' + nextPick + ' h') + '</button><button type="button" class="btn ghost lg" data-action="share">Share the award</button></div>'
-        : '<h1>Not there yet</h1><p class="lede">' + fh(toGo()) + ' hours to go. Every task Sherpa finishes gets you closer. Connect more camps to climb faster.</p><a href="#home" class="btn primary lg">Back to the climb</a>') +
-      '</div>';
+    var p = peakNow(), top = onTop(), goal = peakGoal(p), n = Math.max(1, state.peaksDone.length + (top ? 0 : 1));
+    var focus = p.focus ? ' from ' + listing(focusCamps(p).map(function (c) { return c.name; })) : '';
+    var body = '<div class="summit-wrap"><div class="' + (top ? 'award-on' : 'award-locked') + '">' + award(goal, state.name, n, p.name) + '</div>';
+    if (top && p.final) body += '<h1>A week without you</h1><p class="lede">The business ran while you were away. ' + goal + ' hours a week, back for ' + esc(whyText()) + '.</p>' +
+      '<div class="row gap12 center"><a href="#range" class="btn primary lg">See the range</a><button type="button" class="btn ghost lg" data-action="share">Share the award</button></div>';
+    else if (top) body += '<h1>You made ' + esc(p.name) + '</h1><p class="lede">' + goal + ' hours a week' + esc(focus) + '.' + (p.first ? ' The range is open. Pick your next peak.' : '') + '</p>' +
+      '<div class="row gap12 center"><a href="#range" class="btn primary lg">' + (p.first ? 'See the range' : 'Choose your next peak') + '</a><button type="button" class="btn ghost lg" data-action="share">Share the award</button></div>';
+    else body += '<h1>' + esc(p.name) + '</h1><p class="lede">' + esc(p.tag) + '. ' + goal + ' hours a week' + esc(focus) + '.</p>' +
+      '<div class="pk-progress">' + peakProgress(p) + '</div><div class="row gap12 center"><a href="#home" class="btn primary lg">Back to the climb</a>' + (state.peaksDone.length ? '<a href="#range" class="btn ghost lg">The range</a>' : '') + '</div>';
+    body += '</div>';
     if (desk()) return dHeader(r) + '<main class="d-page summit" id="main"><img class="tex" src="assets/texture-mist.svg" alt="">' + body + '</main>';
     return pHeader(r) + '<main class="p-main summit" id="main"><img class="tex" src="assets/texture-mist.svg" alt="">' + body + '</main>' + pTabs(r);
+  }
+  // On Home: the peak you're on, how far up you are, and what's left.
+  function peakCard() {
+    if (!climbing() || !state.introSeen) return '';
+    var p = peakNow(), top = onTop();
+    return '<section class="pk-card" aria-label="' + esc(p.name) + '"><div class="row between"><span class="pk-k">' + (top ? 'You made it' : 'Climbing') + '</span>' +
+      (state.peaksDone.length ? '<a href="#range" class="pk-link">The range ' + icon('arrow', 13, PINE, 2.4) + '</a>' : '<a href="#summit" class="pk-link">Details ' + icon('arrow', 13, PINE, 2.4) + '</a>') + '</div>' +
+      '<b class="pk-name">' + esc(p.name) + '</b>' + (top && !p.final ? '<a href="#range" class="btn primary block pk-next">Pick your next peak</a>' : '<div class="pk-progress">' + peakProgress(p) + '</div>') + '</section>';
+  }
+  // Hours against the goal, and the challenge, with a tick for each that's done.
+  function peakProgress(p) {
+    var h = peakHours(p), goal = peakGoal(p), ch = challenge(p), pct = clamp(Math.round(h / goal * 100), 0, 100);
+    return '<div class="pk-row"><span class="pk-check' + (h >= goal ? ' is-done' : '') + '">' + icon('check', 12, MIST, 3) + '</span><span class="grow col"><b>' + f1(h) + ' of ' + goal + ' h this week</b><span class="pk-track"><span style="width:' + pct + '%"></span></span></span></div>' +
+      (ch ? '<div class="pk-row"><span class="pk-check' + (ch.done ? ' is-done' : '') + '">' + icon('check', 12, MIST, 3) + '</span><span class="grow col"><b>' + esc(ch.text) + '</b><span class="soft sm">' + ch.have + ' of ' + ch.need + '</span></span></div>' : '');
   }
 
   /* ================= the mountain ================= */
@@ -865,9 +914,9 @@
     return out;
   }
   function world(n) {
-    var wk = n + '-' + state.cohort;
+    var wk = n + '-' + indKey();
     if (worlds[wk]) return worlds[wk];
-    var r = rng(seedOf('apex-mountain-' + n + '-' + state.cohort)), cx = MW / 2, side = r() < 0.5 ? -1 : 1;
+    var r = rng(seedOf('apex-mountain-' + n + '-' + indKey())), cx = MW / 2, side = r() < 0.5 ? -1 : 1;
     var summit = [cx + (r() - 0.5) * 640, 250 + r() * 120];
     var base = [cx + (r() - 0.5) * 360, 1880 + r() * 120];
     // The trailhead sits below everything else on the map: the lowest point of the climb.
@@ -921,10 +970,39 @@
       way.push(p);
       spur[q.c.id] = 'M' + r1(base[0]) + ' ' + r1(base[1]) + curve(way).join('');
     });
-    var all = [trailhead, base, summit].concat(D.CAMPS.map(function (c) { return pts[c.id]; }));
+    // Beyond the first peak: the range. Every other peak fans out above and around the first summit, each on its
+    // own trail from it, never between peaks. A Week Without You stands furthest off, the biggest of them all.
+    var rpts = {}, rplaced = [], rlist = rangePeaks().filter(function (p) { return !p.first; });
+    rlist.filter(function (p) { return p.final; }).forEach(function (p) {
+      var fa = -Math.PI / 2 + (r() - 0.5) * 0.6; rpts[p.id] = [summit[0] + Math.cos(fa) * 3400 * 1.3, summit[1] + Math.sin(fa) * 3400]; rplaced.push(rpts[p.id]);
+    });
+    var ro = rlist.filter(function (p) { return !p.final; });
+    for (i = ro.length - 1; i > 0; i--) { var rj = Math.floor(r() * (i + 1)), rt = ro[i]; ro[i] = ro[rj]; ro[rj] = rt; }
+    ro.forEach(function (p) {
+      var best = null, bestScore = -1;
+      for (var t = 0; t < 140; t++) {
+        var a = -Math.PI + 0.12 + r() * (Math.PI - 0.24), d = 1000 + r() * 2200, c = [summit[0] + Math.cos(a) * d * 1.55, summit[1] + Math.sin(a) * d];
+        var score = 9;
+        rplaced.forEach(function (q) { score = Math.min(score, Math.hypot(c[0] - q[0], c[1] - q[1]) / 1150, segDist(c, summit, q) / 420, segDist(q, summit, c) / 420); });
+        if (score > bestScore) { bestScore = score; best = c; }
+      }
+      rpts[p.id] = best; rplaced.push(best);
+    });
+    var rlegs = rlist.map(function (p) {
+      var b2 = rpts[p.id], dx = b2[0] - summit[0], dy = b2[1] - summit[1], len = Math.hypot(dx, dy), nx = -dy / len, ny = dx / len, way = [summit], m = 3 + Math.floor(len / 650);
+      for (var kk = 1; kk < m; kk++) { var tt = kk / m, amp = Math.min(200, len * 0.06) * (kk % 2 ? 1 : -1) * (0.4 + r() * 0.6) * Math.sin(Math.PI * tt); way.push([summit[0] + dx * tt + nx * amp, summit[1] + dy * tt + ny * amp]); }
+      way.push(b2);
+      return { to: p.id, d: 'M' + r1(summit[0]) + ' ' + r1(summit[1]) + curve(way).join('') };
+    });
+    var rr = [summit].concat(rlist.map(function (p) { return rpts[p.id]; }));
+    var rx0 = Math.min.apply(null, rr.map(function (p) { return p[0]; })) - 800, ry0 = Math.min.apply(null, rr.map(function (p) { return p[1]; })) - 700;
+    var rangeCrop = [rx0, ry0, Math.max.apply(null, rr.map(function (p) { return p[0]; })) + 800 - rx0, Math.max.apply(null, rr.map(function (p) { return p[1]; })) + 600 - ry0];
+
+    var all = [trailhead, base, summit].concat(D.CAMPS.map(function (c) { return pts[c.id]; })).concat(rlist.map(function (p) { return rpts[p.id]; }));
     var minX = Math.min.apply(null, all.map(function (p) { return p[0]; })) - 260, maxX = Math.max.apply(null, all.map(function (p) { return p[0]; })) + 260;
     var maxY = Math.max.apply(null, all.map(function (p) { return p[1]; })) + 150;
-    var crop = [minX, summit[1] - 240, maxX - minX, maxY - (summit[1] - 240)];
+    var minY = Math.min.apply(null, all.map(function (p) { return p[1]; })) - 360;
+    var crop = [minX, minY, maxX - minX, maxY - minY];
     // Before Base Camp: the trailhead, Base Camp and every camp around it, all in one view.
     var low = [trailhead, base].concat(D.CAMPS.map(function (c) { return pts[c.id]; }));
     var lx = Math.min.apply(null, low.map(function (p) { return p[0]; })) - 300, ly = Math.min.apply(null, low.map(function (p) { return p[1]; })) - 160;
@@ -936,15 +1014,26 @@
     for (i = 0; i < 14; i++) peaks.push([r() * MW, 300 + r() * (MH - 600), 0.15 + r() * 0.32, 180 + r() * 360, 180 + r() * 420]);
     for (i = 0; i < 30; i++) { var ang = r() * Math.PI * 2, dist = 1900 + r() * 2900; peaks.push([MW / 2 + Math.cos(ang) * dist, MH / 2 + Math.sin(ang) * dist, 0.25 + r() * 0.4, 260 + r() * 420, 260 + r() * 460]); }
     peaks.push([summit[0] - 620 - r() * 200, summit[1] + 700 + r() * 300, 0.45, 360, 620], [summit[0] + 620 + r() * 200, summit[1] + 820 + r() * 300, 0.4, 380, 600]);
+    // the range's own mountains, and rough country between them
+    rlist.forEach(function (p) { var q = rpts[p.id]; peaks.push([q[0], q[1] + 150, p.final ? 1.7 : 0.8 + r() * 0.4, p.final ? 760 : 340 + r() * 160, p.final ? 980 : 420 + r() * 180]); });
+    for (i = 0; i < 60; i++) peaks.push([summit[0] + (r() - 0.5) * 12000, summit[1] - r() * 5000, 0.2 + r() * 0.45, 260 + r() * 520, 260 + r() * 560]);
     var nz = r() * 1000;
     function height(x, y) {
       var h = 0.55 * (1 - clamp(y, -300, MH + 300) / MH) * Math.exp(-Math.pow(Math.max(0, Math.abs(x - MW / 2) - 2200) / 1600, 2));
       for (var q = 0; q < peaks.length; q++) { var pk = peaks[q], dx = (x - pk[0]) / pk[3], dy = (y - pk[1]) / pk[4]; h += pk[2] * Math.exp(-(dx * dx + dy * dy)); }
       return h + 0.035 * Math.sin(x * 0.006 + nz) * Math.cos(y * 0.005 - nz) + 0.02 * Math.sin(x * 0.015 + y * 0.011 + nz * 2);
     }
-    var cell = 34, gx = -2700, gy = -2700, gw = Math.round((MW + 5400) / cell) + 1, gh = Math.round((MH + 5400) / cell) + 1, f = new Float32Array(gw * gh), lo = 1e9, hi = -1e9;
-    for (var j = 0; j < gh; j++) for (i = 0; i < gw; i++) { var v = height(gx + i * cell, gy + j * cell); f[j * gw + i] = v; if (v < lo) lo = v; if (v > hi) hi = v; }
-    var LV = 42, thin = [], thick = [];
+    var terrain = contours(height, -5200, -6800, MW + 10400, MH + 9600, 46, 48);
+    worlds[wk] = { n: wk, pts: pts, sides: sides, trailhead: trailhead, base: base, summit: summit, setupPts: setupPts, setupSegs: setupSegs, climb: climb, spur: spur, crop: crop, approach: approach, rpts: rpts, rlegs: rlegs, rlist: rlist, rangeCrop: rangeCrop, terrain: terrain };
+    return worlds[wk];
+  }
+
+  // Contour lines for a height function over a box: thin lines, and every fifth one heavier, like a real
+  // topographic map. Shared by each mountain and by the range.
+  function contours(height, gx, gy, gwid, ghgt, cell, LV) {
+    var gw = Math.round(gwid / cell) + 1, gh = Math.round(ghgt / cell) + 1, f = new Float32Array(gw * gh), lo = 1e9, hi = -1e9, i, j;
+    for (j = 0; j < gh; j++) for (i = 0; i < gw; i++) { var v = height(gx + i * cell, gy + j * cell); f[j * gw + i] = v; if (v < lo) lo = v; if (v > hi) hi = v; }
+    var thin = [], thick = [];
     for (var L = 1; L < LV; L++) {
       var lv = lo + (hi - lo) * L / LV, out = L % 5 ? thin : thick;
       for (j = 0; j < gh - 1; j++) for (i = 0; i < gw - 1; i++) {
@@ -961,11 +1050,34 @@
         });
       }
     }
-    var terrain = '<rect x="-6000" y="-6000" width="' + (MW + 12000) + '" height="' + (MH + 12000) + '" fill="' + MIST + '"/>' +
+    return '<rect x="' + (gx - 6000) + '" y="' + (gy - 6000) + '" width="' + (gwid + 12000) + '" height="' + (ghgt + 12000) + '" fill="' + MIST + '"/>' +
       '<path d="' + thin.join('') + '" fill="none" stroke="' + PINE + '" stroke-opacity="0.13" stroke-width="1" vector-effect="non-scaling-stroke"/>' +
       '<path d="' + thick.join('') + '" fill="none" stroke="' + PINE + '" stroke-opacity="0.26" stroke-width="1.2" vector-effect="non-scaling-stroke"/>';
-    worlds[wk] = { n: wk, pts: pts, sides: sides, trailhead: trailhead, base: base, summit: summit, setupPts: setupPts, setupSegs: setupSegs, climb: climb, spur: spur, crop: crop, approach: approach, terrain: terrain };
-    return worlds[wk];
+  }
+
+  /* ================= the range ================= */
+  function segDist(p, a, b) { var dx = b[0] - a[0], dy = b[1] - a[1], t = clamp(((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / (dx * dx + dy * dy || 1), 0, 1); return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy); }
+  function peakSheet(id) {
+    var p = peakDef(id), done = peakDone(p.id), here = state.peak.id === p.id && !onTop(), locked = peakLocked(p), ch = p.challenge;
+    var camps = focusCamps(p).filter(function (c) { return p.focus; });
+    sheet('<div class="sheet-head"><span class="cdisc" style="width:48px;height:48px"><img src="assets/icon.svg" alt="" width="22" height="24"></span><div class="col"><h2>' + esc(p.name) + '</h2><span class="soft">' + esc(p.tag) + '</span></div></div>' +
+      (p.final && !done && !here ? '<div class="label">Your goal</div><div class="stepper sm"><button type="button" class="round-btn" data-action="week-goal" data-d="-5" aria-label="Fewer hours">' + icon('minus', 18, PINE, 2.5) + '</button><output class="stepper-num" aria-live="polite">' + peakGoal(p) + '</output><button type="button" class="round-btn" data-action="week-goal" data-d="5" aria-label="More hours">' + icon('plus', 18, PINE, 2.5) + '</button><span class="stepper-unit">hours<br>a week</span></div><p class="soft sm">How much of your week should run without you?</p>' :
+      '<div class="pk-goal"><b class="stat">' + peakGoal(p) + ' h</b><span class="soft">a week' + (camps.length ? ' from these camps' : ', across every camp') + '</span></div>') +
+      (camps.length ? '<div class="chips pk-camps">' + camps.map(function (c) { return '<span class="chip' + (isOn(c.id) ? ' is-on' : '') + '">' + (isOn(c.id) ? '\u2713 ' : '') + esc(c.name) + '</span>'; }).join('') + '</div>' : '') +
+      (ch ? '<div class="label">Challenge</div><p>' + esc(ch.text) + '.</p>' : '') +
+      (here ? '<div class="pk-progress">' + peakProgress(p) + '</div>' : '') +
+      '<div class="pk-acts">' + (done ? '<p class="soft">Climbed. You can climb it again any time.</p><button type="button" class="btn ghost block" data-action="peak-start" data-id="' + p.id + '">Climb it again</button>' :
+        here ? '<a href="#home" class="btn primary block" data-action="close-sheet-go" data-to="home">Back to the climb</a>' :
+        locked ? '<button type="button" class="btn primary block" disabled>Climb 3 peaks to open this one</button>' :
+        !peakDone('first') ? '<button type="button" class="btn primary block" disabled>Reach your first peak to open the range</button>' :
+        '<button type="button" class="btn primary block" data-action="peak-start" data-id="' + p.id + '">Climb ' + esc(p.name) + '</button>') + '</div>', { label: p.name });
+  }
+  function renderRange(r) {
+    var body = '<div class="rg-head"><h1>The range</h1><p class="lede">Every peak is a part of the business to hand over. Pick the next one to climb.</p></div>' +
+      '<section class="view rg-view" data-scope="home" data-key="range" data-lens="map" aria-label="The range"><div class="view-art"></div>' +
+      '<div class="view-ctl" role="group" aria-label="Move around"><button type="button" data-action="zoom" data-f="1.5" aria-label="Zoom in">' + icon('plus', 18, PINE, 2.2) + '</button><button type="button" data-action="zoom" data-f="0.667" aria-label="Zoom out">' + icon('minus', 18, PINE, 2.2) + '</button><button type="button" data-action="recenter" aria-label="Reset the view">' + icon('target', 18, PINE, 2) + '</button></div></section>';
+    if (desk()) return dHeader(r) + '<main class="d-page rg-page" id="main">' + body + '</main>';
+    return pHeader(r) + '<main class="p-main rg-page" id="main">' + body + '</main>' + pTabs(r);
   }
 
   var measure = null;
@@ -991,7 +1103,7 @@
   var labelVB = null;
   function labelAt(p, side, rpx, k, lines) {
     var out = '', gap = (rpx + 8) * k, x = p[0], y = p[1], anchor = 'middle', lh = 15 * k, y0;
-    if (labelVB) {
+    if (labelVB && x >= labelVB[0] && x <= labelVB[0] + labelVB[2]) {
       var wide = Math.max.apply(null, lines.map(function (l) { return l.t.length * ((l.size || 12) * 0.72 + (l.ls == null ? 0.7 : l.ls)) * k; })), L = labelVB[0] + 6 * k, R = labelVB[0] + labelVB[2] - 6 * k;
       var fitsR = x + gap + wide <= R, fitsL = x - gap - wide >= L;
       if (side === 'right' && !fitsR) side = fitsL ? 'left' : 'bottom';
@@ -1007,7 +1119,7 @@
   }
   // The visible part of the map, kept to the frame's shape, between a close-up and the whole mountain.
   // The land you can move around in: the mountain plus wide country on every side.
-  var MAPBOX = { x: -2400, y: -2400, w: MW + 4800, h: MH + 4800 };
+  var MAPBOX = { x: -4800, y: -6400, w: MW + 9600, h: MH + 9000 };
   function fitVB(vb, W, H) { var a = W / H, w = vb[2], h = vb[3], cx = vb[0] + w / 2, cy = vb[1] + h / 2; if (w / h > a) h = w / a; else w = h * a; return [cx - w / 2, cy - h / 2, w, h]; }
   function clampVB(vb, g, W, H) {
     var a = W / H, cx = vb[0] + vb[2] / 2, cy = vb[1] + vb[3] / 2;
@@ -1020,11 +1132,14 @@
   function drawMap(host, opts) {
     var W = host.clientWidth, H = host.clientHeight; if (!W || !H) return;
     var w = world(state.mapN || 1), pre = !climbing(), e = elevation(), still = !!opts.still;
-    var ct = pathTool(w.climb), frac = pre ? 0 : clamp(e / state.summit, 0, 1);
+    // On the first peak you climb its trail; past it, you're out on the trail to the peak you picked.
+    var onRange = !pre && !still && !peakNow().first, leg = onRange ? w.rlegs.filter(function (l) { return l.to === state.peak.id; })[0] : null, rf = clamp(peakHours() / peakGoal(), 0, 1);
+    var ct = pathTool(w.climb), frac = pre ? 0 : onRange || peakDone('first') ? 1 : rf, lt = leg ? pathTool(leg.d) : null;
     // Past Base Camp you start a little way up the summit trail, so your pin never hides Base Camp itself.
     var start = Math.min(ct.len * 0.05, 170), you;
     if (still) you = w.trailhead;
     else if (pre) you = w.trailhead;
+    else if (lt) you = onTop() ? w.rpts[state.peak.id] : lt.at(lt.len * Math.max(0.04, rf * 0.96));
     else you = ct.at(Math.max(ct.len * frac, start));
     var baseSide = ct.at(start)[0] < w.base[0] ? 'right' : 'left';
     var vb;
@@ -1032,7 +1147,10 @@
       var key = (opts.key || 'home') + '-' + w.n;
       // Full screen shows the whole mountain. Before Base Camp the map opens on the way up to it, so every
       // camp is in view; after, it opens on you, like a game camera.
-      var base = clampVB(fitVB(opts.key === 'full' ? w.crop : pre ? w.approach : focusOn(you, W, H, opts.key === 'pv' ? 1300 : 1600), W, H), MAPBOX, W, H);
+      var tp = lt ? w.rpts[state.peak.id] : null;
+      var frame = opts.key === 'full' ? w.crop : opts.key === 'range' ? w.rangeCrop : pre ? w.approach :
+        tp ? [Math.min(w.summit[0], tp[0]) - 650, Math.min(w.summit[1], tp[1]) - 600, Math.abs(w.summit[0] - tp[0]) + 1300, Math.abs(w.summit[1] - tp[1]) + 1300] : focusOn(you, W, H, opts.key === 'pv' ? 1300 : 1600);
+      var base = clampVB(fitVB(frame, W, H), MAPBOX, W, H);
       vb = session.mapVB[key] ? clampVB(session.mapVB[key], MAPBOX, W, H) : base;
       session.mapVB[key] = vb;
       host._map = { key: key, g: MAPBOX, base: base, opts: opts };
@@ -1066,7 +1184,7 @@
     if (!still) [0.25, 0.5, 0.75].forEach(function (fq) {
       var p = ct.at(ct.len * fq);
       s.push('<circle cx="' + r1(p[0]) + '" cy="' + r1(p[1]) + '" r="' + r1(5 * k) + '" fill="' + MIST + '" stroke="' + PINE + '" stroke-width="' + r1(2 * k) + '"/>');
-      if (pre || Math.abs(fq - frac) > 0.08) s.push(halo(p[0] + 10 * k, p[1] + 4 * k, fh(state.summit * fq) + ' h', k, { anchor: 'start', size: 12, weight: 700, ls: 0 }));
+      if (pre || Math.abs(fq - frac) > 0.08) s.push(halo(p[0] + 10 * k, p[1] + 4 * k, fh(firstGoal() * fq) + ' h', k, { anchor: 'start', size: 12, weight: 700, ls: 0 }));
     });
     // trailhead
     var th = w.trailhead;
@@ -1084,16 +1202,35 @@
     var b = w.base;
     s.push(mk(pre ? 'basecamp' : 'go', ' data-to="gear"', 'Base Camp' + (pre ? ', not made yet' : ', ' + modelsLabel())) + '<circle cx="' + r1(b[0]) + '" cy="' + r1(b[1]) + '" r="' + r1(24 * k) + '" fill="' + (pre || still ? MIST : PINE) + '" stroke="' + PINE + '"' + (pre || still ? ' stroke-dasharray="' + r1(5 * k) + ' ' + r1(3.5 * k) + '"' : '') + ' stroke-width="' + r1(2.5 * k) + '"/>' + iconAt('base', b, 22 * k, pre || still ? PINE : MIST) +
       labelAt(b, pre || still ? (b[0] < MW / 2 ? 'left' : 'right') : baseSide, 24, k, pre || still ? [{ t: 'BASE CAMP' }] : [{ t: 'BASE CAMP' }, { t: modelsLabel().toUpperCase(), size: 11, w: 600, o: 0.72 }]) + '</g>');
-    // summit: the Apex mark
-    var sm = w.summit, top = !pre && !still && e >= state.summit;
-    s.push(mk('summit', '', 'Summit, ' + state.summit + ' hours a week') + '<circle cx="' + r1(sm[0]) + '" cy="' + r1(sm[1]) + '" r="' + r1(26 * k) + '" fill="' + (top ? PINE : MIST) + '" stroke="' + PINE + '" stroke-dasharray="' + (top ? '0' : r1(4 * k) + ' ' + r1(4 * k)) + '" stroke-width="' + r1(2 * k) + '"/>' +
+    // the range: a trail from the first summit to every peak, then the peaks. Until the first peak is climbed
+    // they're a faint preview of what's beyond.
+    if (!still) {
+      var open = peakDone('first');
+      w.rlegs.forEach(function (l) {
+        var walked = peakDone(l.to);
+        s.push('<path d="' + l.d + '" fill="none" stroke="' + PINE + '"' + (walked ? solid : dotted) + ends + (open ? '' : ' opacity="0.4"') + '/>');
+        if (leg && l === leg && rf > 0 && !walked) s.push('<path d="' + l.d + '" fill="none" stroke="' + PINE + '" stroke-width="' + r1(3.5 * k) + '" stroke-dasharray="' + r1(lt.len * rf * 0.96) + ' ' + r1(lt.len * 2) + '"' + ends + '/>');
+      });
+      w.rlist.forEach(function (p) {
+        var pt = w.rpts[p.id], done = peakDone(p.id), here = state.peak.id === p.id && !onTop(), locked = peakLocked(p), rp = (p.final ? 34 : 28) * k;
+        var sub = done ? 'CLIMBED' : here ? 'CLIMBING · ' + f1(peakHours(p)) + ' OF ' + peakGoal(p) + ' H' : !open ? 'AFTER FIRST PEAK' : locked ? 'OPENS AFTER 3 PEAKS' : peakGoal(p) + ' H A WEEK';
+        s.push('<g class="mk" data-action="peak" data-id="' + p.id + '" role="button" tabindex="0"' + (open ? '' : ' opacity="0.55"') + ' aria-label="' + esc(p.name + ', ' + sub.toLowerCase()) + '">' +
+          (here ? '<circle cx="' + r1(pt[0]) + '" cy="' + r1(pt[1]) + '" r="' + r1(rp + 9 * k) + '" fill="none" stroke="' + PINE + '" stroke-width="' + r1(2 * k) + '" stroke-opacity="0.5"/>' : '') +
+          '<circle cx="' + r1(pt[0]) + '" cy="' + r1(pt[1]) + '" r="' + r1(rp) + '" fill="' + (done ? PINE : MIST) + '" stroke="' + PINE + '" stroke-width="' + r1(2.5 * k) + '"' + (locked || !open ? ' stroke-dasharray="' + r1(5 * k) + ' ' + r1(3.5 * k) + '"' : '') + '/>' +
+          (done ? iconAt('check', pt, 24 * k, MIST) : '<image href="assets/icon.svg" x="' + r1(pt[0] - 12 * k) + '" y="' + r1(pt[1] - 13 * k) + '" width="' + r1(24 * k) + '" height="' + r1(26 * k) + '"/>') +
+          labelAt(pt, 'bottom', rp / k, k, dense ? [{ t: p.name.toUpperCase(), size: 12 }] : [{ t: p.name.toUpperCase(), size: 13 }, { t: sub, size: 11, w: 600, o: 0.72 }]) + '</g>');
+      });
+    }
+    // summit of the first peak: the Apex mark
+    var sm = w.summit, top = !pre && !still && peakDone('first');
+    s.push(mk('summit', '', 'First Peak, ' + firstGoal() + ' hours a week') + '<circle cx="' + r1(sm[0]) + '" cy="' + r1(sm[1]) + '" r="' + r1(26 * k) + '" fill="' + (top ? PINE : MIST) + '" stroke="' + PINE + '" stroke-dasharray="' + (top ? '0' : r1(4 * k) + ' ' + r1(4 * k)) + '" stroke-width="' + r1(2 * k) + '"/>' +
       '<image href="assets/' + (top ? 'icon-white.svg' : 'icon.svg') + '" x="' + r1(sm[0] - 11 * k) + '" y="' + r1(sm[1] - 12.5 * k) + '" width="' + r1(22 * k) + '" height="' + r1(23.8 * k) + '"/>' +
-      labelAt(sm, sm[0] < MW / 2 ? 'right' : 'left', 26, k, [{ t: 'SUMMIT · ' + state.summit + ' H', size: 13 }, { t: whyTag() + ((state.mapN || 1) > 1 ? ' · MOUNTAIN ' + state.mapN : ''), size: 11, w: 600, o: 0.72 }]) + '</g>');
+      labelAt(sm, sm[0] < MW / 2 ? 'right' : 'left', 26, k, [{ t: 'FIRST PEAK · ' + firstGoal() + ' H', size: 13 }, { t: top ? 'CLIMBED' : whyTag(), size: 11, w: 600, o: 0.72 }]) + '</g>');
     // you: a map pin whose tip marks your spot, with your photo (or the climber) in its head. At the trailhead
     // it stands on top of the trailhead marker.
     if (!still) {
       if (pre) you = [you[0], you[1] - 20 * k];
-      var R = 24 * k, ir = 18 * k, hx = you[0], hy = you[1] - 40 * k, txt = pre ? 'You' : f1(e) + ' h', pw = (22 + txt.length * 9.6) * k, ph = 32 * k;
+      var R = 24 * k, ir = 18 * k, hx = you[0], hy = you[1] - 40 * k, txt = pre ? 'You' : f1(peakHours()) + ' h', pw = (22 + txt.length * 9.6) * k, ph = 32 * k;
       var fitsR = hx + R + 8 * k + pw < vb[0] + vb[2] - 8 * k, px = fitsR ? hx + R + 8 * k : hx - R - 8 * k - pw, py = hy - ph / 2;
       s.push('<g class="mk you-pin" data-action="go" data-to="log" role="button" tabindex="0" aria-label="You, ' + (pre ? 'at the trailhead' : f1(e) + ' hours saved this week') + '">' +
         '<path d="M' + r1(you[0]) + ' ' + r1(you[1]) + ' L' + r1(hx - 0.8 * R) + ' ' + r1(hy + 0.6 * R) + ' A' + r1(R) + ' ' + r1(R) + ' 0 1 1 ' + r1(hx + 0.8 * R) + ' ' + r1(hy + 0.6 * R) + ' Z" fill="' + PINE + '"/>' +
@@ -1106,7 +1243,7 @@
     s.push('</svg>');
     $('.map-over', host).innerHTML = s.join('');
     host.setAttribute('role', 'group');
-    host.setAttribute('aria-label', 'Mountain map. ' + (still ? 'Your route.' : pre ? 'At the trailhead. Base Camp is next.' : 'You have saved ' + f1(e) + ' hours this week of a ' + state.summit + ' hour summit.') + (opts.live ? ' Drag to move around, pinch or scroll to zoom.' : ''));
+    host.setAttribute('aria-label', 'Mountain map. ' + (still ? 'Your route.' : pre ? 'At the trailhead. Base Camp is next.' : 'You are climbing ' + peakNow().name + ': ' + f1(peakHours()) + ' of ' + peakGoal() + ' hours.') + (opts.live ? ' Drag to move around, pinch or scroll to zoom.' : ''));
   }
   function iconAt(name, p, size, color) {
     var sc = size / 24;
@@ -1286,6 +1423,7 @@
     gestures(art);
     if (scope === 'onboard') { art._mode = null; art._map = art._brain = null; art.classList.remove('is-live'); return drawMap(art, { still: true }); }
     art.classList.add('is-live');
+    if (view.dataset.key === 'range') { art._mode = 'map'; art._brain = null; return drawMap(art, { live: true, key: 'range' }); }
     if (scope !== 'home' || lens === 'brain') { art._mode = 'brain'; art._map = null; return drawBrain(art, { camp: scope === 'home' ? null : scope }); }
     art._mode = 'map'; art._brain = null;
     // The snapshot, the map and full screen each keep their own place, so moving around one doesn't move the others.
@@ -1378,31 +1516,39 @@
     var w = world(state.mapN || 1);
     return [{ id: 'trailhead', p: w.trailhead, vw: 1000 }, { id: 'base', p: w.base, vw: 1300 }]
       .concat(D.CAMPS.filter(function (c) { return c.core; }).map(function (c) { return { id: 'camp', camp: c, p: w.pts[c.id], vw: 1100 }; }))
-      .concat([{ id: 'brain' }, { id: 'summit', p: w.summit, vw: 1200 }]);
+      .concat(moreStep(w)).concat([{ id: 'brain' }, { id: 'board', p: w.summit, vw: 2600 }, { id: 'summit', p: w.summit, vw: 1200 }]);
+  }
+  // A wide view over every camp beyond the everyday four.
+  function moreStep(w) {
+    var more = D.CAMPS.filter(function (c) { return !c.core; }).map(function (c) { return w.pts[c.id]; });
+    if (!more.length) return [];
+    var xs = more.map(function (p) { return p[0]; }).concat([w.base[0]]), ys = more.map(function (p) { return p[1]; }).concat([w.base[1]]);
+    var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs), y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
+    return [{ id: 'more', p: [(x0 + x1) / 2, (y0 + y1) / 2], vw: Math.max(x1 - x0, (y1 - y0) * 0.8) + 700 }];
   }
   function introSay(st) {
     if (st.id === 'trailhead') return 'This is the trailhead, ' + state.name + '. You\'re starting here.';
     if (st.id === 'base') return climbing() ? 'This is Base Camp, running on ' + modelsLabel() + '. Every climb starts here.' : 'Let\'s start climbing by setting up Base Camp. Which AI do you use? Pick one for now. You can add more later.';
-    if (st.id === 'camp') {
-      var c = st.camp, ex = D.TRAILS.filter(function (t) { return t.camp === c.id; })[0];
-      return isOn(c.id) ? c.name + ' is connected with ' + toolsLabel(c.id) + '.' : 'This is ' + c.name + '. Here I can ' + (ex ? ex.title.charAt(0).toLowerCase() + ex.title.slice(1) : 'take work off your plate') + ', and more. Connect it now, or later?';
-    }
+    if (st.id === 'camp') return isOn(st.camp.id) ? st.camp.name + ' is connected with ' + toolsLabel(st.camp.id) + '.' : 'This is ' + st.camp.name + '. Connect it now, or later?';
+    if (st.id === 'more') { var n = D.CAMPS.filter(function (c) { return !c.core; }).length; return 'You have ' + words(n).toLowerCase() + ' more camps out here. Connect them any time from Camps. Use a tool that\'s not listed? Every camp has an Other option.'; }
+    if (st.id === 'board') return state.onBoard ? 'You\'re on the leaderboard. Your mastermind sees you climb.' : 'Hikers compare elevation gained on the leaderboard. Want to join? Others see your name and hours, never your work.';
     if (st.id === 'brain') return 'This is the Brain view: another way to view your AI brain. Switch between Map and Brain any time.';
-    return 'Every minute I save you is a minute of elevation gained. Make it to the summit and you\'ve won back ' + state.summit + ' hours of freedom, every week.';
+    return 'This is your first peak: ' + firstGoal() + ' hours a week. Every minute I save you is a minute of elevation gained. Reach it and a whole range opens up.';
   }
   // The choices under Sherpa's line: an AI for Base Camp, a tool for a camp.
   function introActs(st) {
     if (st.id === 'base' && !climbing()) return D.MODELS.map(function (m) { return '<button type="button" class="chipbtn on-pine" data-action="intro-ai" data-model="' + m.id + '">' + m.id + '</button>'; }).join('');
+    if (st.id === 'board' && !state.onBoard) return '<button type="button" class="chipbtn on-pine" data-action="intro-board">Join the leaderboard</button>';
     if (st.id === 'camp' && !isOn(st.camp.id)) return st.camp.tools.concat(['Other']).map(function (t) { return '<button type="button" class="chipbtn on-pine" data-action="intro-tool" data-camp="' + st.camp.id + '" data-tool="' + esc(t) + '">' + esc(t) + '</button>'; }).join('');
     return '';
   }
   function renderIntro() {
     var n = introSteps().length;
     return '<main class="intro" id="main"><section class="view is-full is-intro" data-scope="home" data-lens="map" aria-label="Your mountain"><div class="view-art"></div></section>' +
-      '<div class="intro-card pine" role="dialog" aria-label="Sherpa intro">' + sherpaDisc(true, 48) +
-      '<div class="grow col"><b>Sherpa</b><p class="intro-say" aria-live="polite"></p><div class="chips intro-acts" role="group" aria-label="Choose"></div>' +
-      '<div class="row between intro-foot"><span class="intro-dots" aria-hidden="true">' + new Array(n + 1).join('<i></i>') + '</span>' +
-      '<span class="row gap8"><button type="button" class="btn ghost-mist sm" data-action="intro-skip">Skip</button><button type="button" class="btn mist sm" data-action="intro-next">Next</button></span></div></div></div></main>';
+      '<div class="intro-card pine" role="dialog" aria-label="Sherpa intro">' +
+      '<div class="intro-head">' + sherpaDisc(true, 36) + '<b class="grow">Sherpa</b><span class="intro-dots" aria-hidden="true">' + new Array(n + 1).join('<i></i>') + '</span></div>' +
+      '<p class="intro-say" aria-live="polite"></p><div class="chips intro-acts" role="group" aria-label="Choose"></div>' +
+      '<div class="intro-foot"><button type="button" class="btn text-mist sm" data-action="intro-skip">Skip</button><button type="button" class="btn mist sm" data-action="intro-next">Next</button></div></div></main>';
   }
   var intro = { i: 0, typing: 0, text: '' };
   function introType(text) {
@@ -1417,7 +1563,7 @@
     var choice = introActs(st);
     if (acts) { acts.innerHTML = choice; acts.hidden = !choice; }
     // A camp can wait: Later moves on. Base Camp needs an AI before the climb can start, but Skip still works.
-    if (nx) { nx.textContent = last ? 'Start the climb' : choice && st.id === 'camp' ? 'Later' : 'Next'; nx.hidden = !!choice && st.id === 'base'; }
+    if (nx) { nx.textContent = last ? 'Start the climb' : choice && st.id === 'camp' ? 'Later' : choice && st.id === 'board' ? 'Not now' : 'Next'; nx.hidden = !!choice && st.id === 'base'; }
   }
   function introShow(i) {
     var steps = introSteps(), st = steps[i]; if (!st || !$('.intro-say')) return;
@@ -1452,7 +1598,7 @@
   }
   function introEnd() {
     clearInterval(intro.typing); cancelAnimationFrame(session.flyRaf); clearTimeout(intro.next);
-    state.introSeen = true; if (climbing()) state.nextAt = Date.now() + 3000;
+    state.introSeen = true; intro.on = false; intro.i = 0; if (climbing()) state.nextAt = Date.now() + 3000;
     delete session.mapVB.intro; save(); go('home');
   }
 
@@ -1533,10 +1679,11 @@
   }
 
   /* ================= actions ================= */
-  function crossSummit(before) {
-    var e = elevation();
-    if (state.onboarded && before < state.summit && e >= state.summit && state.reached !== state.summit) { nextPick = null; save(); toast('You made the summit.'); go('summit'); return true; }
-    return false;
+  // Reaching the top of the peak you're on: it's logged once, then the summit page opens.
+  function crossSummit() {
+    if (!state.onboarded || !state.introSeen || onTop() || !peakReached()) return false;
+    state.peaksDone.push({ id: state.peak.id, at: Date.now(), hours: peakGoal() }); state.summits = state.peaksDone.length; save();
+    toast('You made ' + peakNow().name + '.'); go('summit'); return true;
   }
   function afterGain(before, msg) { if (crossSummit(before)) return; toast(msg); render(); }
   function connectCamp(id) {
@@ -1593,6 +1740,11 @@
       if (intro.i < introSteps().length - 1) introShow(intro.i + 1); else introEnd();
     },
     'intro-skip': function () { introEnd(); },
+    'intro-board': function () {
+      state.onBoard = true; save(); introButtons(introSteps()[intro.i]);
+      introType('You\'re on. Your mastermind sees you climb.');
+      clearTimeout(intro.next); intro.next = setTimeout(function () { if ($('.intro-say')) introShow(intro.i + 1); }, 1800);
+    },
     'step-open': function (el) { stepSheet(el.dataset.id); },
     'step-block': function (el) {
       var st = D.STEPS.filter(function (x) { return x.id === el.dataset.id; })[0], d = new Date(); d.setMinutes(d.getMinutes() < 30 ? 30 : 60, 0, 0);
@@ -1621,8 +1773,12 @@
       toast('A new day. Sherpa is back at work.'); go('home');
     },
     'set-cohort': function (el) {
-      state.cohort = el.dataset.c; applyIndustry(); save();
-      if (state.onboarded) toast('Your map is now set up for ' + industry().plural.toLowerCase() + '.');
+      var id = el.dataset.c, i = state.inds.indexOf(id);
+      if (i > -1) { if (state.onboarded && state.inds.length === 1) { toast('Keep at least one.'); return; } state.inds.splice(i, 1); }
+      else state.inds.push(id);
+      state.cohort = state.inds[0] || '';
+      applyIndustry(); save();
+      if (state.onboarded) toast('Your map now covers ' + listing(inds().map(function (x) { return x.name.toLowerCase(); })) + '.');
       render();
     },
     'toggle-ranks': function () { state.hideRanks = !state.hideRanks; save(); render(); },
@@ -1644,7 +1800,7 @@
       introType(el.dataset.tool + ' is connected. ' + camp(id).name + ' camp is made.');
       clearTimeout(intro.next); intro.next = setTimeout(function () { if ($('.intro-say')) introShow(intro.i + 1); }, 1800);
     },
-    'intro-replay': function () { state.introSeen = false; save(); go('home'); },
+    'intro-replay': function () { state.introSeen = false; intro.on = false; intro.i = 0; save(); go('home'); },
     'basecamp': function () { baseSheet(); },
     'map-key': function () { state.mapKey = !keyOpen(); save(); render(); },
     'appr-open': function (el) { session.apprOpen[el.dataset.id] = !session.apprOpen[el.dataset.id]; render(); },
@@ -1670,7 +1826,7 @@
     },
     'go': function (el) { go(el.dataset.to); },
     'toast': function (el) { toast(el.dataset.msg); },
-    'summit': function () { if (!state.onboarded) { toast('Your summit: ' + state.summit + ' h a week, for ' + whyText() + '.'); return; } if (elevation() >= state.summit) go('summit'); else toast('Summit: ' + state.summit + ' h a week. ' + fh(toGo()) + ' to go.'); },
+    'summit': function () { if (!state.onboarded) { toast(peakNow().name + ': ' + peakGoal() + ' h a week.'); return; } go('summit'); },
     'approve': function (el) {
       var a = apprOf(el.dataset.id), inChat = !!el.closest('.chat-sheet');
       if (inChat) session.chat.push({ who: 'sherpa', text: 'Done. ' + a.log + '.' });
@@ -1707,12 +1863,12 @@
     'memory': function (el) { memorySheet(el.dataset.name, el.dataset.group, el.dataset.camp); },
     'gear-summit': function (el) { state.summit = clamp(state.summit + Number(el.dataset.d), 1, 60); save(); render(); },
     'reset': function () { try { localStorage.removeItem(KEY); } catch (e) { } state = fresh(); session.chat = []; session.chatAbout = null; session.snoozed = {}; session.cam = {}; session.mapVB = {}; brainCache = {}; go('start-welcome'); },
-    'next-pick': function (el) { nextPick = el.dataset.v === 'hold' ? 'hold' : Number(el.dataset.v); render(); },
-    'next-set': function () {
-      state.summits = (state.summits || 0) + 1; state.reached = state.summit;
-      if (nextPick !== 'hold') { state.summit = nextPick; state.mapN = (state.mapN || 1) + 1; }
-      nextPick = null; save();
-      toast(state.reached === state.summit ? 'Holding at ' + state.summit + '. Enjoy the view.' : 'A new mountain. Summit ' + state.summit + ' h a week.');
+    'peak': function (el) { peakSheet(el.dataset.id); },
+    'week-goal': function (el) { state.weekGoal = clamp(peakGoal(peakDef('week')) + Number(el.dataset.d), 10, 60); save(); peakSheet('week'); },
+    'peak-start': function (el) {
+      var p = peakDef(el.dataset.id);
+      state.peak = { id: p.id, at: Date.now() }; session.mapVB = {}; save(); closeSheet();
+      toast('Climbing ' + p.name + '. ' + peakGoal(p) + ' h a week from ' + listing(focusCamps(p).map(function (c) { return c.name; }).slice(0, 3)) + '.');
       go('home');
     },
     'share': function () { toast('Your award gets a share link here.'); },
@@ -1737,7 +1893,8 @@
     markCleared(); save();
     if (crossSummit(before)) return;
     var st = !openApprovals().length && streak();
-    toast((list.length === 1 ? list[0].who + ': done. +' + list[0].min + ' min saved.' : 'All clear. +' + list.reduce(function (s, a) { return s + a.min; }, 0) + ' min saved.') + (st ? ' Trail clear, ' + st + (st === 1 ? ' day' : ' days') + ' in a row.' : ''));
+    var left = openApprovals().length, mins = list.reduce(function (s, a) { return s + a.min; }, 0);
+    toast((list.length === 1 ? list[0].who + ': done. +' + mins + ' min saved.' : (left ? 'Done. ' : 'All clear. ') + '+' + mins + ' min saved.') + (left ? ' ' + words(left) + ' more just came in.' : st ? ' Trail clear, ' + st + (st === 1 ? ' day' : ' days') + ' in a row.' : ''));
     render();
   }
 
@@ -1820,13 +1977,15 @@
                     r.name === 'report' ? renderReport(r) :
                       r.name === 'gear' ? renderGear(r) :
                         r.name === 'leaderboard' ? renderBoard(r) :
+                          r.name === 'range' ? renderRange(r) :
                         renderSummit(r);
     var changed = session.last !== r.hash;
     app.className = 'app ' + (desk() ? 'is-desk' : 'is-phone') + ' r-' + (introNow ? 'intro' : r.name);
+    document.documentElement.classList.toggle('no-scroll', !!introNow); // the tour fills the screen; nothing behind it scrolls
     app.innerHTML = html;
     if (r.name === 'camp' && !desk() && isOn(r.camp)) { var slot = $('.p-view-slot'); if (slot) slot.outerHTML = viewPanel(r.camp, { cls: 'is-preview' }) + '<div class="sp-card pine">' + campSherpa(camp(r.camp)) + '</div>'; }
     mountViews();
-    if (introNow) { delete session.mapVB.intro; var v = $('.view.is-intro .view-art'); if (v) drawMap(v, { live: true, key: 'intro' }); introShow(0); }
+    if (introNow) { delete session.mapVB.intro; var v = $('.view.is-intro .view-art'); if (v) drawMap(v, { live: true, key: 'intro' }); introShow(intro.on ? Math.min(intro.i, introSteps().length - 1) : 0); intro.on = true; }
     document.title = titleFor(r) + ' · Apex Sherpa';
     session.last = r.hash;
     if (changed) { window.scrollTo(0, 0); var m = $('#main'); if (m) m.scrollTop = 0; }
@@ -1839,6 +1998,7 @@
     session.dirty = false; render();
   }
   function tick() {
+    if (crossSummit()) return;
     var before = elevation(), had = openApprovals().map(function (a) { return a.id; }), n = work(Date.now());
     if (n) {
       save();
@@ -1850,7 +2010,7 @@
     if (n || session.dirty) liveRender();
   }
   function titleFor(r) {
-    return { start: 'Setup', leaderboard: 'Leaderboard', home: 'Home', map: 'Map', approvals: 'Approvals', camps: 'Camps', camp: r.camp ? camp(r.camp).name : 'Camp', log: 'Trail log', report: 'Trail report', gear: 'Settings', summit: 'Summit' }[r.name];
+    return { start: 'Setup', leaderboard: 'Leaderboard', range: 'The range', home: 'Home', map: 'Map', approvals: 'Approvals', camps: 'Camps', camp: r.camp ? camp(r.camp).name : 'Camp', log: 'Trail log', report: 'Trail report', gear: 'Settings', summit: 'Summit' }[r.name];
   }
 
   function boot() {
