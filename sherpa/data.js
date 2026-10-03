@@ -38,24 +38,24 @@ window.SHERPA_DATA = (function () {
       named: [["Leo's onboarding", 0], ['Friday payroll', 1]] }
   ];
 
-  // Trails: work Sherpa offers to take over. Each one raises how much time Sherpa can save you;
-  // the time only counts once Sherpa has actually done the work (done: how each finished task reads in the log).
+  // Trails: work Sherpa offers to take over. hours is Sherpa's estimate, shown only as an estimate. What counts
+  // is each task Sherpa actually finishes: done is how it reads in the log, min the time it would have taken you.
   var TRAILS = [
-    { id: 't1', camp: 'clients', title: 'Send invoices on signing', text: '14 invoices sent by hand. Let me send them the moment a deal signs.', hours: 1.5, done: 'Sent an invoice the moment a deal signed' },
-    { id: 't2', camp: 'mail', title: 'Handle rescheduling', text: 'You move 9 meetings a week. Let me handle the back and forth.', hours: 1.2, done: 'Rescheduled a meeting for you' },
-    { id: 't3', camp: 'clients', title: 'Draft proposal follow-ups', text: 'Follow-ups wait 3 days on average. Let me draft them the next morning.', hours: 1.0, done: 'Drafted a proposal follow-up' },
-    { id: 't4', camp: 'mail', title: 'Guard your Fridays', text: 'Meetings keep landing on your Friday block. Let me decline them.', hours: 1.0, done: 'Declined a meeting on your Friday block' },
-    { id: 't5', camp: 'chat', title: 'Answer repeat questions', text: 'The same five questions come up in #ops. Let me answer them.', hours: 0.9, done: 'Answered a repeat question in #ops' },
-    { id: 't6', camp: 'projects', title: 'Emails to tasks', text: 'Action items die in your inbox. Let me turn them into tasks.', hours: 0.8, done: 'Turned emails into tasks' },
-    { id: 't7', camp: 'money', title: 'Chase late invoices', text: 'Late invoices sit for two weeks. Let me send the reminders.', hours: 0.7, done: 'Chased a late invoice' },
-    { id: 't8', camp: 'chat', title: 'One evening summary', text: 'Let me send one summary at 6 instead of 40 pings.', hours: 0.6, done: 'Sent your evening summary' },
-    { id: 't9', camp: 'support', title: 'Answer password resets', text: 'Half your tickets are password resets. Let me answer them.', hours: 0.6, done: 'Answered password resets' },
-    { id: 't10', camp: 'money', title: 'Sort expenses', text: 'Let me sort expenses as they come in.', hours: 0.5, done: 'Sorted new expenses' },
-    { id: 't11', camp: 'store', title: 'Answer order questions', text: '"Where\'s my order?" is a third of your inbox. Let me answer it.', hours: 1.2, done: 'Answered an order question' },
-    { id: 't12', camp: 'marketing', title: 'Weekly campaign report', text: 'You pull campaign numbers by hand every Monday. Let me send them.', hours: 1.0, done: 'Sent the campaign report' },
-    { id: 't13', camp: 'social', title: 'Reply to comments', text: 'Comments sit for days. Let me reply the same day.', hours: 0.8, done: 'Replied to new comments' },
-    { id: 't14', camp: 'docs', title: 'File attachments', text: 'Attachments pile up in your inbox. Let me file them in Drive.', hours: 0.6, done: 'Filed new attachments' },
-    { id: 't15', camp: 'team', title: 'Approve time off', text: 'Time-off requests wait on you. Let me approve the routine ones.', hours: 0.5, done: 'Approved a time-off request' }
+    { id: 't1', min: 6, camp: 'clients', title: 'Send invoices on signing', text: '14 invoices sent by hand. Let me send them the moment a deal signs.', hours: 1.5, done: 'Sent an invoice the moment a deal signed' },
+    { id: 't2', min: 15, camp: 'mail', title: 'Handle rescheduling', text: 'You move 9 meetings a week. Let me handle the back and forth.', hours: 1.2, done: 'Rescheduled a meeting for you' },
+    { id: 't3', min: 15, camp: 'clients', title: 'Draft proposal follow-ups', text: 'Follow-ups wait 3 days on average. Let me draft them the next morning.', hours: 1.0, done: 'Drafted a proposal follow-up' },
+    { id: 't4', min: 10, camp: 'mail', title: 'Guard your Fridays', text: 'Meetings keep landing on your Friday block. Let me decline them.', hours: 1.0, done: 'Declined a meeting on your Friday block' },
+    { id: 't5', min: 8, camp: 'chat', title: 'Answer repeat questions', text: 'The same five questions come up in #ops. Let me answer them.', hours: 0.9, done: 'Answered a repeat question in #ops' },
+    { id: 't6', min: 10, camp: 'projects', title: 'Emails to tasks', text: 'Action items die in your inbox. Let me turn them into tasks.', hours: 0.8, done: 'Turned emails into tasks' },
+    { id: 't7', min: 8, camp: 'money', title: 'Chase late invoices', text: 'Late invoices sit for two weeks. Let me send the reminders.', hours: 0.7, done: 'Chased a late invoice' },
+    { id: 't8', min: 20, camp: 'chat', title: 'One evening summary', text: 'Let me send one summary at 6 instead of 40 pings.', hours: 0.6, done: 'Sent your evening summary' },
+    { id: 't9', min: 12, camp: 'support', title: 'Answer password resets', text: 'Half your tickets are password resets. Let me answer them.', hours: 0.6, done: 'Answered password resets' },
+    { id: 't10', min: 10, camp: 'money', title: 'Sort expenses', text: 'Let me sort expenses as they come in.', hours: 0.5, done: 'Sorted new expenses' },
+    { id: 't11', min: 15, camp: 'store', title: 'Answer order questions', text: '"Where\'s my order?" is a third of your inbox. Let me answer it.', hours: 1.2, done: 'Answered an order question' },
+    { id: 't12', min: 45, camp: 'marketing', title: 'Weekly campaign report', text: 'You pull campaign numbers by hand every Monday. Let me send them.', hours: 1.0, done: 'Sent the campaign report' },
+    { id: 't13', min: 15, camp: 'social', title: 'Reply to comments', text: 'Comments sit for days. Let me reply the same day.', hours: 0.8, done: 'Replied to new comments' },
+    { id: 't14', min: 8, camp: 'docs', title: 'File attachments', text: 'Attachments pile up in your inbox. Let me file them in Drive.', hours: 0.6, done: 'Filed new attachments' },
+    { id: 't15', min: 5, camp: 'team', title: 'Approve time off', text: 'Time-off requests wait on you. Let me approve the routine ones.', hours: 0.5, done: 'Approved a time-off request' }
   ];
 
   var APPROVALS = [
