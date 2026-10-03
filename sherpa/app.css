@@ -709,3 +709,4 @@ html.no-scroll, html.no-scroll body { overflow: hidden; overscroll-behavior: non
 .stepper.sm { margin-top: 8px; } .stepper.sm .stepper-num { font-size: 40px; }
 .rate-form p.rate-say { margin-top: 14px; font-size: 15px; line-height: 1.45; color: var(--soft); max-width: 46ch; }
 .start-copy > .start-sub, .p-start > .start-sub { margin-top: 10px; }
+.pk-range { font-size: 11px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--soft); }

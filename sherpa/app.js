@@ -66,6 +66,9 @@
     if (!s.inds) s.inds = s.cohort ? [s.cohort] : [];
     if (!s.peak || !s.peak.id) s.peak = { id: 'first', at: s.baseAt || 0 };
     if (!s.peaksDone) s.peaksDone = [];
+    var renamed = { admin: 'inbox', cash: 'payday', revenue: 'pipeline', care: 'helpdesk', ops: 'delivery' };
+    if (renamed[s.peak.id]) s.peak.id = renamed[s.peak.id];
+    s.peaksDone.forEach(function (d) { if (renamed[d.id]) d.id = renamed[d.id]; });
     s.models = s.models.map(function (m) { return m === 'GPT' ? 'ChatGPT' : m === 'Llama' ? 'Other' : m; }).filter(function (m, i, a) { return a.indexOf(m) === i; });
     delete s.why;
     return s;
@@ -141,11 +144,17 @@
     var from = Math.max(state.peak.at || 0, Date.now() - WEEK_MS), ids = p.focus ? focusCamps(p).map(function (c) { return c.id; }) : null;
     return r1(liveDone().filter(function (d) { return d.ts >= from && (!ids || ids.indexOf(d.camp) > -1); }).reduce(function (a, d) { return a + d.min; }, 0) / 60);
   }
+  // What proves the handover happened, counted from when you started the peak.
   function challenge(p) {
-    p = p || peakNow(); var ch = p.challenge; if (!ch) return null;
-    var have = ch.type === 'streak' ? streak() : ch.type === 'steps' ? D.STEPS.filter(function (st) { return (state.stepsDone[st.id] || 0) >= (state.peak.at || 0); }).length : focusCamps(p).filter(function (c) { return isOn(c.id); }).length;
-    var need = ch.type === 'camps' ? Math.min(ch.n, focusCamps(p).length) : ch.n;
-    return { text: ch.text, have: Math.min(have, need), need: need, done: have >= need };
+    p = p || peakNow(); var ch = p.done; if (!ch) return null;
+    var from = state.peak.at || 0, ids = focusCamps(p).map(function (c) { return c.id; });
+    var mine = liveDone().filter(function (d) { return d.ts >= from && (!p.focus || ids.indexOf(d.camp) > -1); }), have;
+    if (ch.type === 'streak') have = streak();
+    else if (ch.type === 'steps') have = D.STEPS.filter(function (st) { return (state.stepsDone[st.id] || 0) >= from; }).length;
+    else if (ch.type === 'blocks') have = Object.keys(state.blocked || {}).filter(function (k) { return state.blocked[k] >= from; }).length;
+    else if (ch.type === 'approvals') have = mine.filter(function (d) { return /^a\d/.test(d.id); }).length;
+    else have = mine.filter(function (d) { return !/^[as]\d/.test(d.id); }).length;
+    return { text: ch.text, have: Math.min(have, ch.n), need: ch.n, done: have >= ch.n };
   }
   function peakDone(id) { return state.peaksDone.some(function (d) { return d.id === id; }); }
   function onTop() { return state.peaksDone.some(function (d) { return d.id === state.peak.id && d.at >= (state.peak.at || 0); }); }
@@ -1054,13 +1063,17 @@
   /* ================= the range ================= */
   function segDist(p, a, b) { var dx = b[0] - a[0], dy = b[1] - a[1], t = clamp(((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / (dx * dx + dy * dy || 1), 0, 1); return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy); }
   function peakSheet(id) {
-    var p = peakDef(id), done = peakDone(p.id), here = state.peak.id === p.id && !onTop(), locked = peakLocked(p), ch = p.challenge;
-    var camps = focusCamps(p).filter(function (c) { return p.focus; });
-    sheet('<div class="sheet-head"><span class="cdisc" style="width:48px;height:48px"><img src="assets/icon.svg" alt="" width="22" height="24"></span><div class="col"><h2>' + esc(p.name) + '</h2><span class="soft">' + esc(p.tag) + '</span></div></div>' +
-      (p.final && !done && !here ? '<div class="label">Your goal</div><div class="stepper sm"><button type="button" class="round-btn" data-action="week-goal" data-d="-5" aria-label="Fewer hours">' + icon('minus', 18, PINE, 2.5) + '</button><output class="stepper-num" aria-live="polite">' + peakGoal(p) + '</output><button type="button" class="round-btn" data-action="week-goal" data-d="5" aria-label="More hours">' + icon('plus', 18, PINE, 2.5) + '</button><span class="stepper-unit">hours<br>a week</span></div><p class="soft sm">How much of your week should run without you?</p>' :
-      '<div class="pk-goal"><b class="stat">' + peakGoal(p) + ' h</b><span class="soft">a week' + (camps.length ? ' from these camps' : ', across every camp') + '</span></div>') +
-      (camps.length ? '<div class="chips pk-camps">' + camps.map(function (c) { return '<span class="chip' + (isOn(c.id) ? ' is-on' : '') + '">' + (isOn(c.id) ? '\u2713 ' : '') + esc(c.name) + '</span>'; }).join('') + '</div>' : '') +
-      (ch ? '<div class="label">Challenge</div><p>' + esc(ch.text) + '.</p>' : '') +
+    var p = peakDef(id), done = peakDone(p.id), here = state.peak.id === p.id && !onTop(), locked = peakLocked(p), ch = p.done;
+    var camps = p.focus ? focusCamps(p) : [], goal = peakGoal(p);
+    sheet('<div class="sheet-head"><span class="cdisc" style="width:48px;height:48px"><img src="assets/icon.svg" alt="" width="22" height="24"></span><div class="col">' +
+      (p.range ? '<span class="pk-range">' + esc(p.range) + ' range</span>' : '') + '<h2>' + esc(p.name) + '</h2><span class="soft">' + esc(p.tag) + '</span></div></div>' +
+      (p.hand ? '<div class="label">You hand over</div><p>' + esc(p.hand) + '.</p>' : '') +
+      (camps.length ? '<div class="chips pk-camps">' + camps.map(function (c) { return '<span class="chip' + (isOn(c.id) ? ' is-on' : '') + '">' + (isOn(c.id) ? '✓ ' : '') + esc(c.name) + '</span>'; }).join('') + '</div>' : '') +
+      '<div class="label">Goal</div>' +
+      (p.final && !done && !here ? '<div class="stepper sm"><button type="button" class="round-btn" data-action="week-goal" data-d="-5" aria-label="Fewer hours">' + icon('minus', 18, PINE, 2.5) + '</button><output class="stepper-num" aria-live="polite">' + goal + '</output><button type="button" class="round-btn" data-action="week-goal" data-d="5" aria-label="More hours">' + icon('plus', 18, PINE, 2.5) + '</button><span class="stepper-unit">hours<br>a week</span></div>' :
+        '<div class="pk-goal"><b class="stat">' + goal + ' h</b><span class="soft">a week' + (camps.length ? '' : ', across every camp') + '</span></div>') +
+      '<p class="soft sm">Worth ' + boughtBack(goal) + ' a week at your Buyback Rate.</p>' +
+      (ch ? '<div class="label">Done when</div><p>' + esc(ch.text) + '.</p>' : '') +
       (here ? '<div class="pk-progress">' + peakProgress(p) + '</div>' : '') +
       '<div class="pk-acts">' + (done ? '<p class="soft">Climbed. You can climb it again any time.</p><button type="button" class="btn ghost block" data-action="peak-start" data-id="' + p.id + '">Climb it again</button>' :
         here ? '<a href="#home" class="btn primary block" data-action="close-sheet-go" data-to="home">Back to the climb</a>' :
@@ -1069,7 +1082,7 @@
         '<button type="button" class="btn primary block" data-action="peak-start" data-id="' + p.id + '">Climb ' + esc(p.name) + '</button>') + '</div>', { label: p.name });
   }
   function renderRange(r) {
-    var body = '<div class="rg-head"><h1>The range</h1><p class="lede">Every peak is a part of the business to hand over. Pick the next one to climb.</p></div>' +
+    var body = '<div class="rg-head"><h1>The range</h1><p class="lede">Every peak hands over one part of the business: admin, operations, growth, then leadership. Climb them in any order.</p></div>' +
       '<section class="view rg-view" data-scope="home" data-key="range" data-lens="map" aria-label="The range"><div class="view-art"></div>' +
       '<div class="view-ctl" role="group" aria-label="Move around"><button type="button" data-action="zoom" data-f="1.5" aria-label="Zoom in">' + icon('plus', 18, PINE, 2.2) + '</button><button type="button" data-action="zoom" data-f="0.667" aria-label="Zoom out">' + icon('minus', 18, PINE, 2.2) + '</button><button type="button" data-action="recenter" aria-label="Reset the view">' + icon('target', 18, PINE, 2) + '</button></div></section>';
     if (desk()) return dHeader(r) + '<main class="d-page rg-page" id="main">' + body + '</main>';

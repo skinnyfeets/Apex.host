@@ -188,33 +188,44 @@ window.SHERPA_DATA = (function () {
 
   // The range. The first peak is the warm-up, sized by the hours you picked when you started. Reaching it opens
   // the range: peaks scattered around it, each its own trail from the first peak, climbed in any order. Every
-  // peak is a part of the business to hand over. focus: the camps whose work counts on it (only the ones your
-  // industry has). hours: the weekly goal from those camps. challenge: what else it takes to stand on top.
-  // The last peak opens once you've climbed three others.
+  // peak hands over one part of the business, in the order Buy Back Your Time's Replacement Ladder climbs it:
+  // admin, then operations, then growth, then leadership (range).
+  //   name: the mountain. tag: what you get. hand: what you hand over.
+  //   focus: the camps whose work counts (only the ones your industry has; none means every camp).
+  //   hours: the weekly goal from those camps. done: what proves the handover really happened.
+  // Kinds of "done": streak (days in a row you cleared everything), approvals (things that needed you in these
+  // camps, cleared), tasks (work Sherpa finished in these camps), steps (Today's steps finished), blocks (focus
+  // time you protected). Counted from when you start the peak. The last peak opens after three others.
   var PEAKS = [
     { id: 'first', name: 'First Peak', tag: 'Learning the ropes', first: true },
-    { id: 'inbox', name: 'Inbox Pass', tag: 'Your inbox, handled', focus: ['mail'], hours: 4,
-      challenge: { type: 'streak', n: 3, text: 'Clear everything that needs you 3 days in a row' } },
-    { id: 'admin', name: 'Admin Peak', tag: 'Inbox, calendar and invoices', focus: ['mail', 'money', 'docs'], hours: 6,
-      challenge: { type: 'streak', n: 3, text: 'Clear everything that needs you 3 days in a row' } },
-    { id: 'cash', name: 'Cash Flow Crag', tag: 'Invoices, bills and payroll', focus: ['money', 'team'], hours: 3,
-      challenge: { type: 'streak', n: 2, text: 'Clear everything that needs you 2 days in a row' } },
-    { id: 'proposals', name: 'Proposal Spire', tag: 'Follow-ups and proposals', focus: ['clients', 'mail'], hours: 5,
-      challenge: { type: 'steps', n: 2, text: 'Finish 2 of Today\'s steps' } },
-    { id: 'revenue', name: 'Revenue Ridge', tag: 'Sales and marketing', focus: ['clients', 'marketing', 'social', 'store'], hours: 6,
-      challenge: { type: 'camps', n: 2, text: 'Connect 2 camps that feed this peak' } },
-    { id: 'care', name: 'Client Care Col', tag: 'Support and happy customers', focus: ['support', 'clients', 'store'], hours: 5,
-      challenge: { type: 'streak', n: 3, text: 'Clear everything that needs you 3 days in a row' } },
-    { id: 'content', name: 'Content Cliffs', tag: 'Posts, newsletters and comments', focus: ['social', 'marketing'], hours: 4,
-      challenge: { type: 'camps', n: 2, text: 'Connect 2 camps that feed this peak' } },
-    { id: 'ops', name: 'Operations Ridge', tag: 'Projects, support and the team', focus: ['projects', 'support', 'team', 'chat'], hours: 6,
-      challenge: { type: 'camps', n: 2, text: 'Connect 2 camps that feed this peak' } },
-    { id: 'team', name: 'Team Tor', tag: 'Your team, out of your inbox', focus: ['team', 'chat', 'projects'], hours: 4,
-      challenge: { type: 'camps', n: 2, text: 'Connect 2 camps that feed this peak' } },
-    { id: 'deep', name: 'Deep Work Dome', tag: 'Hours back for the work only you can do', hours: 10,
-      challenge: { type: 'steps', n: 3, text: 'Finish 3 of Today\'s steps' } },
-    { id: 'week', name: 'A Week Without You', tag: 'The business runs while you\'re away', final: true, needs: 3, hours: 20,
-      challenge: { type: 'streak', n: 5, text: 'Clear everything that needs you 5 days in a row' } }
+
+    { id: 'inbox', range: 'Admin', name: 'Inbox Ridge', tag: 'Your inbox, handled', hand: 'Replies, sorting and the back-and-forth', focus: ['mail'], hours: 4,
+      done: { type: 'streak', n: 3, text: 'Nothing waits on you overnight, 3 days running' } },
+    { id: 'calendar', range: 'Admin', name: 'Calendar Col', tag: 'Your week runs to plan', hand: 'Scheduling, rescheduling and guarding your focus time', focus: ['mail'], hours: 3,
+      done: { type: 'blocks', n: 3, text: 'Protect your focus time 3 times' } },
+    { id: 'payday', range: 'Admin', name: 'Payday Pass', tag: 'Paid on time, without chasing', hand: 'Invoices, reminders, bills and payroll prep', focus: ['money'], hours: 3,
+      done: { type: 'approvals', n: 2, text: 'Clear 2 payments that need you' } },
+
+    { id: 'delivery', range: 'Operations', name: 'Delivery Dome', tag: 'Work ships without you', hand: 'Turning requests into tasks and keeping them moving', focus: ['projects'], hours: 4,
+      done: { type: 'tasks', n: 6, text: 'Sherpa moves 6 pieces of work forward' } },
+    { id: 'helpdesk', range: 'Operations', name: 'Helpdesk Heights', tag: 'Customers answered the same day', hand: 'Tickets, order questions and the usual fixes', focus: ['support', 'store'], hours: 4,
+      done: { type: 'tasks', n: 6, text: 'Sherpa answers 6 batches of tickets' } },
+    { id: 'team', range: 'Operations', name: 'Teamwork Traverse', tag: 'Your team stops waiting on you', hand: 'Answers, sign-offs and time-off requests', focus: ['team', 'chat'], hours: 4,
+      done: { type: 'approvals', n: 2, text: 'Clear 2 things your team needs' } },
+
+    { id: 'pipeline', range: 'Growth', name: 'Pipeline Peak', tag: 'No lead goes cold', hand: 'Follow-ups, deal updates and call notes', focus: ['clients'], hours: 5,
+      done: { type: 'approvals', n: 2, text: 'Send 2 follow-ups the day they\'re due' } },
+    { id: 'proposals', range: 'Growth', name: 'Proposal Spire', tag: 'Proposals out the same week', hand: 'First drafts of proposals, from your own notes', focus: ['clients', 'docs'], hours: 4,
+      done: { type: 'steps', n: 2, text: 'Finish 2 drafts Sherpa started for you' } },
+    { id: 'content', range: 'Growth', name: 'Content Cliffs', tag: 'Seen everywhere, without posting', hand: 'Scheduling posts, newsletters and replies', focus: ['social', 'marketing'], hours: 4,
+      done: { type: 'tasks', n: 6, text: 'Sherpa handles 6 posts, sends or replies' } },
+    { id: 'market', range: 'Growth', name: 'Market Mesa', tag: 'Orders handled while you sleep', hand: 'Order questions, refunds and restocks', focus: ['store'], hours: 4,
+      done: { type: 'tasks', n: 6, text: 'Sherpa handles 6 batches of orders' } },
+
+    { id: 'deep', range: 'Leadership', name: 'Perfect Week Peak', tag: 'Your week, designed on purpose', hand: 'Everything that keeps you from the work only you can do', hours: 10,
+      done: { type: 'steps', n: 4, text: 'Finish 4 of Today\'s steps' } },
+    { id: 'week', range: 'Leadership', name: 'A Week Without You', tag: 'The business runs while you\'re away', hand: 'The whole business, for a week', final: true, needs: 3, hours: 20,
+      done: { type: 'streak', n: 5, text: 'Nothing waits on you, 5 days running' } }
   ];
 
   var MODELS = [
