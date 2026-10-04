@@ -1009,7 +1009,10 @@
     var rx0 = Math.min.apply(null, rr.map(function (p) { return p[0]; })) - 800, ry0 = Math.min.apply(null, rr.map(function (p) { return p[1]; })) - 700;
     var rangeCrop = [rx0, ry0, Math.max.apply(null, rr.map(function (p) { return p[0]; })) + 800 - rx0, Math.max.apply(null, rr.map(function (p) { return p[1]; })) + 600 - ry0];
 
-    var all = [trailhead, base, summit].concat(D.CAMPS.map(function (c) { return pts[c.id]; })).concat(rlist.map(function (p) { return rpts[p.id]; }));
+    var hill = [trailhead, base, summit].concat(D.CAMPS.map(function (c) { return pts[c.id]; }));
+    var hx0 = Math.min.apply(null, hill.map(function (p) { return p[0]; })) - 320, hy0 = summit[1] - 320;
+    var mountCrop = [hx0, hy0, Math.max.apply(null, hill.map(function (p) { return p[0]; })) + 320 - hx0, Math.max.apply(null, hill.map(function (p) { return p[1]; })) + 240 - hy0];
+    var all = hill.concat(rlist.map(function (p) { return rpts[p.id]; }));
     var minX = Math.min.apply(null, all.map(function (p) { return p[0]; })) - 260, maxX = Math.max.apply(null, all.map(function (p) { return p[0]; })) + 260;
     var maxY = Math.max.apply(null, all.map(function (p) { return p[1]; })) + 150;
     var minY = Math.min.apply(null, all.map(function (p) { return p[1]; })) - 360;
@@ -1035,7 +1038,7 @@
       return h + 0.035 * Math.sin(x * 0.006 + nz) * Math.cos(y * 0.005 - nz) + 0.02 * Math.sin(x * 0.015 + y * 0.011 + nz * 2);
     }
     var terrain = contours(height, -5200, -6800, MW + 10400, MH + 9600, 46, 48);
-    worlds[wk] = { n: wk, pts: pts, sides: sides, trailhead: trailhead, base: base, summit: summit, setupPts: setupPts, setupSegs: setupSegs, climb: climb, spur: spur, crop: crop, approach: approach, rpts: rpts, rlegs: rlegs, rlist: rlist, rangeCrop: rangeCrop, terrain: terrain };
+    worlds[wk] = { n: wk, pts: pts, sides: sides, trailhead: trailhead, base: base, summit: summit, setupPts: setupPts, setupSegs: setupSegs, climb: climb, spur: spur, crop: crop, approach: approach, rpts: rpts, rlegs: rlegs, rlist: rlist, rangeCrop: rangeCrop, mountCrop: mountCrop, terrain: terrain };
     return worlds[wk];
   }
 
@@ -1170,7 +1173,7 @@
       session.mapVB[key] = vb;
       host._map = { key: key, g: MAPBOX, base: base, opts: opts };
     } else {
-      vb = clampVB(fitVB(w.crop, W, H), MAPBOX, W, H);
+      vb = clampVB(fitVB(w.mountCrop, W, H), MAPBOX, W, H);
       host._map = null;
     }
     labelVB = vb;
@@ -1189,11 +1192,12 @@
     var dotted = ' stroke-opacity="0.9" stroke-width="' + r1(3.2 * k) + '" stroke-dasharray="0 ' + r1(8 * k) + '"', solid = ' stroke-width="' + r1(3.5 * k) + '"', ends = ' stroke-linecap="round" stroke-linejoin="round"';
     var setup = 'M' + r1(w.trailhead[0]) + ' ' + r1(w.trailhead[1]) + w.setupSegs.join('');
     // the trail to Base Camp: solid once you're there
-    s.push('<path d="' + setup + '" fill="none" stroke="' + PINE + '"' + (pre || still ? dotted : solid) + ends + '/>');
+    var route = ' stroke-width="' + r1(7.5 * k) + '" stroke-dasharray="0 ' + r1(13 * k) + '"';
+    s.push('<path d="' + setup + '" fill="none" stroke="' + PINE + '"' + (still ? route : pre ? dotted : solid) + ends + '/>');
     // a trail from Base Camp to each camp
-    D.CAMPS.forEach(function (c) { if (w.spur[c.id]) s.push('<path d="' + w.spur[c.id] + '" fill="none" stroke="' + PINE + '"' + (isOn(c.id) && !still ? solid : dotted) + ends + '/>'); });
+    D.CAMPS.forEach(function (c) { if (w.spur[c.id]) s.push('<path d="' + w.spur[c.id] + '" fill="none" stroke="' + PINE + '"' + (isOn(c.id) && !still ? solid : dotted) + ends + (still ? ' opacity="0.4"' : '') + '/>'); });
     // the climb: dotted ahead, solid walked
-    s.push('<path d="' + w.climb + '" fill="none" stroke="' + PINE + '"' + dotted + ends + '/>');
+    s.push('<path d="' + w.climb + '" fill="none" stroke="' + PINE + '"' + (still ? route : dotted) + ends + '/>');
     if (frac > 0) s.push('<path d="' + w.climb + '" fill="none" stroke="' + PINE + '" stroke-width="' + r1(3.5 * k) + '" stroke-dasharray="' + r1(ct.len * frac) + ' ' + r1(ct.len * 2) + '"' + ends + '/>');
     // hour markers on the climb
     if (!still) [0.25, 0.5, 0.75].forEach(function (fq) {
