@@ -698,7 +698,6 @@ html.no-scroll, html.no-scroll body { overflow: hidden; overscroll-behavior: non
 /* a bigger map on the phone's Home */
 .view.is-preview { height: 640px; }
 .award-on, .award-locked { width: 100%; display: flex; justify-content: center; }
-.rec { margin-top: 12px; font-size: 14px; }
 /* the range gets the whole screen below its title */
 .rg-head { margin-bottom: 12px; }
 .rg-head .lede { margin-top: 6px; }

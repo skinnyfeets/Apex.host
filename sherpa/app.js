@@ -66,6 +66,8 @@
     if (!s.inds) s.inds = s.cohort ? [s.cohort] : [];
     if (!s.peak || !s.peak.id) s.peak = { id: 'first', at: s.baseAt || 0 };
     if (!s.peaksDone) s.peaksDone = [];
+    // Older saves started at 20 hours. Anyone still setting up who hasn't picked a number starts at the suggested 5.
+    if (!s.onboarded && !s.summitSet) s.summit = 5;
     var renamed = { admin: 'inbox', cash: 'payday', revenue: 'pipeline', care: 'helpdesk', ops: 'delivery' };
     if (renamed[s.peak.id]) s.peak.id = renamed[s.peak.id];
     s.peaksDone.forEach(function (d) { if (renamed[d.id]) d.id = renamed[d.id]; });
@@ -449,7 +451,6 @@
         '<div class="stepper"><button type="button" class="round-btn" data-action="hours" data-d="-1" aria-label="Fewer hours">' + icon('minus', 20, PINE, 2.5) + '</button>' +
         '<output class="stepper-num" aria-live="polite">' + state.summit + '</output>' +
         '<button type="button" class="round-btn" data-action="hours" data-d="1" aria-label="More hours">' + icon('plus', 20, PINE, 2.5) + '</button><span class="stepper-unit">hours<br>a week</span></div>' +
-        '<p class="soft rec">Recommended to start: 5 h. It\'s your first peak. You\'ll climb higher from there.</p>' +
         '<h2 class="start-h2">What do you want the extra time for?</h2>' + whyChips() +
         '<div class="row gap12"><button type="button" class="btn primary lg" data-action="step" data-to="rate">Next</button><button type="button" class="btn text" data-action="step" data-to="industry">Back</button></div>';
     }
@@ -1728,7 +1729,7 @@
 
   var handlers = {
     'step': function (el) { state.step = el.dataset.to; save(); go('start-' + el.dataset.to); },
-    'hours': function (el) { state.summit = clamp(state.summit + Number(el.dataset.d), 1, 60); save(); render(); },
+    'hours': function (el) { state.summit = clamp(state.summit + Number(el.dataset.d), 1, 60); state.summitSet = true; save(); render(); },
     'set-why': function (el) {
       var w = el.dataset.why, i = state.whys.indexOf(w);
       if (i > -1) { if (state.whys.length === 1) { toast('Keep at least one reason.'); return; } state.whys.splice(i, 1); }
