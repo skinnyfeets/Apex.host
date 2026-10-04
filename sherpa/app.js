@@ -431,7 +431,7 @@
   function startBody(step) {
     if (step === 'name') {
       return '<h1>What\'s your name?</h1>' +
-        '<form class="name-form" data-form="name"><label class="sr" for="you-name">Your first name</label>' +
+        '<form class="name-form" data-form="name">' + photoPick(72) + '<label class="sr" for="you-name">Your first name</label>' +
         '<input id="you-name" name="name" class="big-input" type="text" autocomplete="given-name" placeholder="Your first name" value="' + esc(state.name) + '">' +
         (session.nameError ? '<p class="err" role="alert">Add your first name to keep going.</p>' : '') +
         '<div class="row gap12"><button type="submit" class="btn primary lg">Next</button><button type="button" class="btn text" data-action="step" data-to="guide">Back</button></div></form>';

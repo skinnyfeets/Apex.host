@@ -102,7 +102,7 @@ g.mk:focus-visible { outline: 2px solid var(--pine); outline-offset: 2px; }
 .d-page.narrow { width: 100%; max-width: 760px; margin: 0 auto; }
 .d-page.center { display: flex; justify-content: center; align-items: flex-start; }
 .d-start { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 472px) minmax(0, 1fr); gap: 40px; padding: 24px 40px; }
-.start-copy { min-height: 0; overflow: auto; padding: 24px 4px 24px 0; }
+.start-copy { min-height: 0; overflow: auto; padding: 24px 8px 24px 8px; margin-left: -8px; }
 .start-copy > .row, .start-copy > .chips { margin-top: 24px; }
 .start-copy > .row:last-of-type { margin-top: 32px; }
 .start-art { min-height: 0; display: flex; }
