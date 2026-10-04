@@ -476,7 +476,7 @@
   function renderStart(r) {
     var step = r.step === 'trailhead' ? 'coords' : r.step;
     if (step === 'welcome') {
-      return '<main class="hello" id="main"><h1>Ready to start the climb to freedom?</h1>' +
+      return '<main class="hello" id="main"><h1>Ready to start your climb to freedom?</h1>' +
         '<button type="button" class="btn primary lg" data-action="step" data-to="guide">Let’s go</button></main>';
     }
     if (step === 'guide') {
