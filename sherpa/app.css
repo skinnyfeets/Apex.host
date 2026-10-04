@@ -710,3 +710,8 @@ html.no-scroll, html.no-scroll body { overflow: hidden; overscroll-behavior: non
 .rate-form p.rate-say { margin-top: 14px; font-size: 15px; line-height: 1.45; color: var(--soft); max-width: 46ch; }
 .start-copy > .start-sub, .p-start > .start-sub { margin-top: 10px; }
 .pk-range { font-size: 11px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--soft); }
+/* one clean outline on the big name field: the border thickens instead of a second ring */
+.big-input:focus, .big-input:focus-visible { outline: none; border-width: 2.5px; }
+/* the welcome that introduces your guide */
+.hello-guide .disc { border: 3px solid var(--pine); }
+.hello-guide h1 { max-width: 14ch; }

@@ -225,7 +225,7 @@
   var KNOWN = ['home', 'map', 'approvals', 'log', 'camps', 'gear', 'report', 'summit', 'leaderboard', 'range'];
   function parse() {
     var h = (location.hash || '').replace(/^#\/?/, '');
-    if (!state.onboarded) { if (!/^start-(welcome|name|industry|summit|rate|coords|trailhead)$/.test(h)) h = 'start-' + state.step; }
+    if (!state.onboarded) { if (!/^start-(welcome|guide|name|industry|summit|rate|coords|trailhead)$/.test(h)) h = 'start-' + state.step; }
     else if (!h || /^start-/.test(h)) h = 'home';
     var m = h.match(/^camp-([a-z]+)$/);
     if (m && !camp(m[1])) { h = 'camps'; m = null; }
@@ -248,7 +248,8 @@
   function avatar() { return '<button type="button" class="avatar' + (state.photo ? ' has-photo' : '') + '" data-action="go" data-to="gear" aria-label="Settings">' + face() + '</button>'; }
   function chip(t) { return '<span class="chip">' + t + '</span>'; }
   // Sherpa's mark is a big S, so it never reads as the Apex logo.
-  function sherpaDisc(onPine, size) { return '<span class="disc ' + (onPine ? 'disc-mist' : 'disc-pine') + '" style="width:' + size + 'px;height:' + size + 'px"><span class="s-mark" style="font-size:' + Math.round(size * 0.56) + 'px">S</span></span>'; }
+  // Sherpa's portrait: the guide in his rust beanie, on a light disc on Pine and a Pine ring on Mist.
+  function sherpaDisc(onPine, size) { return '<span class="disc ' + (onPine ? 'disc-mist' : 'disc-pine') + '" style="width:' + size + 'px;height:' + size + 'px"><img src="assets/sherpa.svg" alt="" width="' + size + '" height="' + size + '"></span>'; }
   function campDisc(c, size, dashed) { return '<span class="cdisc' + (dashed ? ' is-dashed' : '') + '" style="width:' + size + 'px;height:' + size + 'px">' + icon(c.icon, Math.round(size * 0.46), PINE, 1.8) + '</span>'; }
 
   function elevCard(compact) {
@@ -430,10 +431,10 @@
   function startBody(step) {
     if (step === 'name') {
       return '<h1>What\'s your name?</h1>' +
-        '<form class="name-form" data-form="name">' + photoPick(72) + '<label class="sr" for="you-name">Your first name</label>' +
+        '<form class="name-form" data-form="name"><label class="sr" for="you-name">Your first name</label>' +
         '<input id="you-name" name="name" class="big-input" type="text" autocomplete="given-name" placeholder="Your first name" value="' + esc(state.name) + '">' +
         (session.nameError ? '<p class="err" role="alert">Add your first name to keep going.</p>' : '') +
-        '<div class="row gap12"><button type="submit" class="btn primary lg">Next</button><button type="button" class="btn text" data-action="step" data-to="welcome">Back</button></div></form>';
+        '<div class="row gap12"><button type="submit" class="btn primary lg">Next</button><button type="button" class="btn text" data-action="step" data-to="guide">Back</button></div></form>';
     }
     if (step === 'industry') {
       return '<h1>What kind of business do you run?</h1>' +
@@ -474,9 +475,13 @@
   function renderStart(r) {
     var step = r.step === 'trailhead' ? 'coords' : r.step;
     if (step === 'welcome') {
-      return '<main class="hello" id="main"><h1>Are you ready to reach the summit?</h1>' +
-        '<p class="lede">Sherpa is your guide. It connects to the tools you already use, does the busywork in them and gives you the hours back.</p>' +
-        '<button type="button" class="btn primary lg" data-action="step" data-to="name">Let’s go</button></main>';
+      return '<main class="hello" id="main"><h1>Ready to start the climb to freedom?</h1>' +
+        '<button type="button" class="btn primary lg" data-action="step" data-to="guide">Let’s go</button></main>';
+    }
+    if (step === 'guide') {
+      return '<main class="hello hello-guide" id="main">' + sherpaDisc(false, 148) + '<h1>Hey, I’m your Sherpa guide.</h1>' +
+        '<p class="lede">I’ll take tasks off your plate so you can find the freedom you’ve been looking for.</p>' +
+        '<div class="row gap12 center"><button type="button" class="btn primary lg" data-action="step" data-to="name">Nice to meet you</button><button type="button" class="btn text" data-action="step" data-to="welcome">Back</button></div></main>';
     }
     var art = step === 'coords' ? '<section class="view is-static" data-scope="onboard" data-lens="map" aria-label="Your route"><div class="view-art"></div></section>' : '';
     if (desk()) {

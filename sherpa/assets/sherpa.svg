@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Sherpa, your guide">
+  <!-- Sherpa, the guide: a friendly mountain guide in a rust beanie and a mustard scarf, the range behind him. -->
+  <defs><clipPath id="sherpa-round"><circle cx="60" cy="60" r="60"/></clipPath></defs>
+  <g clip-path="url(#sherpa-round)">
+    <rect width="120" height="120" fill="#DDE6DF"/>
+    <circle cx="92" cy="30" r="9" fill="#F3E6C8"/>
+    <path d="M0 78 L24 50 L38 64 L58 38 L80 66 L96 52 L120 74 L120 120 L0 120 Z" fill="#9FBAAA"/>
+    <path d="M58 38 L66 48 L61 47 L57 51 L53 46 L50 48 Z M24 50 L30 57 L26 56 L23 59 L20 55 Z" fill="#ECECE4"/>
+    <path d="M0 92 L30 70 L52 84 L76 68 L120 90 L120 120 L0 120 Z" fill="#5F8A73"/>
+    <!-- jacket and pack straps -->
+    <path d="M14 120 C16 100 34 90 60 90 C86 90 104 100 106 120 Z" fill="#2E6A4E"/>
+    <path d="M36 95 C40 104 42 112 42 120 L34 120 C34 112 32 104 29 98 Z M84 95 C80 104 78 112 78 120 L86 120 C86 112 88 104 91 98 Z" fill="#6E4A2A"/>
+    <!-- neck and scarf -->
+    <rect x="52" y="76" width="16" height="12" rx="5" fill="#D9A27A"/>
+    <path d="M40 90 C46 82 74 82 80 90 C76 96 44 96 40 90 Z" fill="#E2A33B"/>
+    <path d="M66 92 L72 106 L64 106 L61 93 Z" fill="#C98C27"/>
+    <!-- head -->
+    <circle cx="60" cy="58" r="21" fill="#EDBE94"/>
+    <ellipse cx="38.5" cy="60" rx="3.5" ry="5" fill="#E2AE84"/>
+    <ellipse cx="81.5" cy="60" rx="3.5" ry="5" fill="#E2AE84"/>
+    <!-- beard -->
+    <path d="M40 60 C40 76 49 84 60 84 C71 84 80 76 80 60 C77 66 72 69 66 68 C63 66 57 66 54 68 C48 69 43 66 40 60 Z" fill="#8B5A35"/>
+    <path d="M54 72 C57 74.5 63 74.5 66 72 C64 75.5 56 75.5 54 72 Z" fill="#6B4024"/>
+    <!-- face -->
+    <circle cx="52.5" cy="57" r="2.3" fill="#1C3A28"/>
+    <circle cx="67.5" cy="57" r="2.3" fill="#1C3A28"/>
+    <path d="M48.5 52.2 C50.5 50.6 54.5 50.6 56.5 52" stroke="#6B4024" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+    <path d="M63.5 52 C65.5 50.6 69.5 50.6 71.5 52.2" stroke="#6B4024" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+    <ellipse cx="60" cy="63" rx="3" ry="2.4" fill="#D99A6E"/>
+    <ellipse cx="47" cy="63" rx="3.5" ry="2" fill="#E58F72" opacity="0.45"/>
+    <ellipse cx="73" cy="63" rx="3.5" ry="2" fill="#E58F72" opacity="0.45"/>
+    <!-- beanie -->
+    <path d="M38.5 50 C38.5 32 48 25 60 25 C72 25 81.5 32 81.5 50 Z" fill="#C9552D"/>
+    <path d="M47 30 L47 49 M54 26.5 L54 49 M60 25.5 L60 49 M66 26.5 L66 49 M73 30 L73 49" stroke="#B4482A" stroke-width="1.6"/>
+    <rect x="36.5" y="45" width="47" height="9" rx="4.5" fill="#A8431F"/>
+    <circle cx="60" cy="23" r="5.5" fill="#ECECE4"/>
+  </g>
+</svg>
